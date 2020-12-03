@@ -4,8 +4,6 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module Main where
-
 import Control.Comonad ((=>>))
 import Data.Aeson
 import Data.Maybe
@@ -50,17 +48,11 @@ main = do
             =>> addSource sourceConfig
             =>> addProcessor
               "filter"
-              ( filterProcessor
-                  ( \Record {..} ->
-                      fromJust (fmap (not . TL.null) recordKey)
-                        && temperature recordValue >= 50
-                        && humidity recordValue >= 0
-                  )
-              )
+              (filterProcessor filterR)
               ["source"]
             =>> addSink sinkConfig ["filter"]
-  mockStore <- mkMockTopicStore
 
+  mockStore <- mkMockTopicStore
   mp <- mkMockTopicProducer mockStore
   mc' <- mkMockTopicConsumer mockStore
 
@@ -77,7 +69,6 @@ main = do
           }
 
   mc <- subscribe mc' ["demo-sink"]
-
   async $
     forever $ do
       records <- pollRecords mc 1000000
@@ -92,6 +83,11 @@ main = do
               tcLogFunc = lf
             }
     runTask taskConfig task
+
+filterR :: Record TL.Text R -> Bool
+filterR Record {..} =
+  temperature recordValue >= 50
+    && humidity recordValue >= 0
 
 mkMockData :: IO MockMessage
 mkMockData = do
