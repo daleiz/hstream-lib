@@ -20,6 +20,7 @@ module HStream.Processor
     SinkConfig (..),
     Deserializer (..),
     Serializer (..),
+    Serde (..),
     TaskConfig (..),
     MessageStoreType (..),
     MockTopicStore (..),
