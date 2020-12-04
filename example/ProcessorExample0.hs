@@ -32,14 +32,14 @@ main = do
         SourceConfig
           { sourceName = "source",
             sourceTopicName = "demo-source",
-            keyDeserializer = Deserializer (\s -> TLE.decodeUtf8 s :: TL.Text),
+            keyDeserializer = voidDeserializer,
             valueDeserializer = Deserializer (\s -> (fromJust $ decode s) :: R)
           }
   let sinkConfig =
         SinkConfig
           { sinkName = "sink",
             sinkTopicName = "demo-sink",
-            keySerializer = Serializer (TLE.encodeUtf8 :: TL.Text -> BL.ByteString),
+            keySerializer = voidSerializer,
             valueSerializer = Serializer (encode :: R -> BL.ByteString)
           }
   let task =
@@ -84,7 +84,7 @@ main = do
             }
     runTask taskConfig task
 
-filterR :: Record TL.Text R -> Bool
+filterR :: Record Void R -> Bool
 filterR Record {..} =
   temperature recordValue >= 50
     && humidity recordValue >= 0
