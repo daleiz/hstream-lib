@@ -14,12 +14,15 @@ module HStream.Processor
     mkMockTopicStore,
     mkMockTopicConsumer,
     mkMockTopicProducer,
+    voidSerializer,
+    voidDeserializer,
     Record (..),
     Processor (..),
     SourceConfig (..),
     SinkConfig (..),
     Deserializer (..),
     Serializer (..),
+    Serde (..),
     TaskConfig (..),
     MessageStoreType (..),
     MockTopicStore (..),
@@ -100,14 +103,14 @@ validateTopology TaskTopologyConfig {..} =
 data SourceConfig k v = SourceConfig
   { sourceName :: T.Text,
     sourceTopicName :: T.Text,
-    keyDeserializer :: Deserializer k,
+    keyDeserializer :: Maybe (Deserializer k),
     valueDeserializer :: Deserializer v
   }
 
 data SinkConfig k v = SinkConfig
   { sinkName :: T.Text,
     sinkTopicName :: T.Text,
-    keySerializer :: Serializer k,
+    keySerializer :: Maybe (Serializer k),
     valueSerializer :: Serializer v
   }
 
@@ -125,7 +128,7 @@ addSource cfg@SourceConfig {..} builder =
             InternalSourceConfig
               { iSourceName = sourceName,
                 iSourceTopicName = sourceTopicName,
-                iKeyDeserializer = toDyn $ runDeser keyDeserializer,
+                iKeyDeserializer = toDyn $ fmap runDeser keyDeserializer,
                 iValueDeserializer = toDyn $ runDeser valueDeserializer
               },
         topology =
@@ -144,7 +147,7 @@ buildSourceProcessor SourceConfig {..} = Processor $ \Record {..} -> do
   logDebug "enter source processor"
   ctx <- ask
   writeIORef (curProcessor ctx) sourceName
-  let rk = fmap (runDeser keyDeserializer) recordKey
+  let rk = fmap runDeser keyDeserializer <*> recordKey
   let rv = runDeser valueDeserializer recordValue
   let rr =
         Record
@@ -204,7 +207,7 @@ addSink cfg@SinkConfig {..} parentNames builder =
             InternalSinkConfig
               { iSinkName = sinkName,
                 iSinkTopicName = sinkTopicName,
-                iKeySerializer = toDyn $ runSer keySerializer,
+                iKeySerializer = toDyn $ fmap runSer keySerializer,
                 iValueSerializer = toDyn $ runSer valueSerializer
               }
       }
@@ -311,6 +314,12 @@ dumbProcessor = return ()
 newtype Deserializer a = Deserializer {runDeser :: BL.ByteString -> a}
 
 newtype Serializer a = Serializer {runSer :: a -> BL.ByteString}
+
+voidDeserializer :: Maybe (Deserializer Void)
+voidDeserializer = Nothing
+
+voidSerializer :: Maybe (Serializer Void)
+voidSerializer = Nothing
 
 data Serde a = Serde
   { serializer :: Serializer a,
