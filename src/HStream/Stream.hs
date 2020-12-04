@@ -57,8 +57,8 @@ import qualified RIO.Text as T
 --
 -- we just use phethomenond
 data Stream k v = Stream
-  { streamKeySerde :: Serde k,
-    streamValueSerde :: Serde v,
+  { streamKeySerde :: Maybe (Serde k),
+    streamValueSerde :: Maybe (Serde v),
     -- streamInternalBuilder :: TaskBuilder,
     streamProcessorName :: T.Text,
     streamStreamBuilder :: StreamBuilder
@@ -279,8 +279,27 @@ filterProcessor ::
 filterProcessor f = Processor $ \r ->
   when (f r) $ forward r
 
-map :: Stream k1 v1 -> ((k1, v1) -> (k2, v2)) -> IO (Stream k2 v2)
-map = undefined
+mapProcessor ::
+  (Typeable k1, Typeable v1, Typeable k2, Typeable v2) =>
+  (Record k1 v1 -> Record k2 v2) ->
+  Processor k1 v1
+mapProcessor f = Processor $ forward . f 
+
+map ::
+  (Typeable k1, Typeable v1, Typeable k2, Typeable v2) =>
+  (Record k1 v1 -> Record k2 v2) ->
+  Stream k1 v1 ->
+  IO (Stream k2 v2)
+map f stream@Stream{..} = do 
+  name <- mkInternalProcessorName "MAP-" (sbProcessorIndex streamStreamBuilder)
+  let p = mapProcessor f
+  let taskBuilder' = sbTaskBuilder streamStreamBuilder
+  let taskBuilder = taskBuilder' =>> addProcessor name p [streamProcessorName]
+  return
+    stream
+      { streamStreamBuilder = streamStreamBuilder {sbTaskBuilder = taskBuilder},
+        streamProcessorName = name
+      }
 
 -- stateful api :
 -- - agg
@@ -325,3 +344,30 @@ map = undefined
 -- we can assign it to particular windows.
 -- then trigger window computing.
 -- add state to processors.
+--
+--
+
+-- 假定 key 是可选的，
+-- 那么在 sourceConfig 里面 keyDeserializer
+-- 就是可选的，
+-- 那么如果不设置 valueDeserializer 呢，
+-- 是否可以默认为是 Text ?
+-- 这个可以没有，
+-- 显式大于隐式.
+-- 
+-- 如果 keyDeserializer 是 Nothing,
+-- 会有什么影响吗？
+-- 在 runTask 的时候，
+-- 从 sourceTopic poll 数据回来，
+-- 这时候如果数据里面没有 key,
+-- 那么设置不设置 keySerializer 都没关系，
+-- 如果数据里面包含 key,
+-- 同时也提供了 keySerializer,
+-- 那么就可以执行正常的反序列化操作，
+-- 如果这时候 keyDeserializer 也是 Nothing,
+-- 这时候默认无法执行反序列化的操作，
+-- 结果也是 Nothing.
+-- 这就是一个 Applicative ?
+-- Maybe function 作用在 Maybe data 上面
+--
+--
