@@ -193,8 +193,8 @@ from StreamSourceConfig {..} sb@StreamBuilder {..} = do
   let taskBuilder = sbTaskBuilder =>> addSource sourceCfg
   return
     Stream
-      { streamKeySerde = sscKeySerde,
-        streamValueSerde = sscValueSerde,
+      { streamKeySerde = Just sscKeySerde,
+        streamValueSerde = Just sscValueSerde,
         -- streamInternalBuilder :: TaskBuilder,
         streamProcessorName = sourceProcessorName,
         streamStreamBuilder =
@@ -283,14 +283,14 @@ mapProcessor ::
   (Typeable k1, Typeable v1, Typeable k2, Typeable v2) =>
   (Record k1 v1 -> Record k2 v2) ->
   Processor k1 v1
-mapProcessor f = Processor $ forward . f 
+mapProcessor f = Processor $ forward . f
 
 map ::
   (Typeable k1, Typeable v1, Typeable k2, Typeable v2) =>
   (Record k1 v1 -> Record k2 v2) ->
   Stream k1 v1 ->
   IO (Stream k2 v2)
-map f stream@Stream{..} = do 
+map f stream@Stream {..} = do
   name <- mkInternalProcessorName "MAP-" (sbProcessorIndex streamStreamBuilder)
   let p = mapProcessor f
   let taskBuilder' = sbTaskBuilder streamStreamBuilder
@@ -298,7 +298,9 @@ map f stream@Stream{..} = do
   return
     stream
       { streamStreamBuilder = streamStreamBuilder {sbTaskBuilder = taskBuilder},
-        streamProcessorName = name
+        streamProcessorName = name,
+        streamKeySerde = Nothing,
+        streamValueSerde = Nothing
       }
 
 -- stateful api :
@@ -354,7 +356,7 @@ map f stream@Stream{..} = do
 -- 是否可以默认为是 Text ?
 -- 这个可以没有，
 -- 显式大于隐式.
--- 
+--
 -- 如果 keyDeserializer 是 Nothing,
 -- 会有什么影响吗？
 -- 在 runTask 的时候，

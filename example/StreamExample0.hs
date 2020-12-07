@@ -4,7 +4,6 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-import Control.Comonad ((=>>))
 import Data.Aeson
 import Data.Maybe
 import qualified Data.Text.Lazy as TL
@@ -27,6 +26,15 @@ instance ToJSON R
 
 instance FromJSON R
 
+data R1 = R1
+  { r1Temperature :: Int
+  }
+  deriving (Generic, Show, Typeable)
+
+instance ToJSON R1
+
+instance FromJSON R1
+
 main :: IO ()
 main = do
   let textSerde =
@@ -43,6 +51,13 @@ main = do
           } ::
           Serde R
 
+  let r1Serde =
+        Serde
+          { serializer = Serializer encode,
+            deserializer = Deserializer $ fromJust . decode
+          } ::
+          Serde R1
+
   let streamSourceConfig =
         HS.StreamSourceConfig
           { sscTopicName = "demo-source",
@@ -54,13 +69,14 @@ main = do
         HS.StreamSinkConfig
           { sicTopicName = "demo-sink",
             sicKeySerde = textSerde,
-            sicValueSerde = rSerde
+            sicValueSerde = r1Serde
           }
 
   task <-
     HS.mkStreamBuilder "demo"
       >>= HS.from streamSourceConfig
-      >>= HS.filter filterF
+      >>= HS.filter filterR
+      >>= HS.map mapR
       >>= HS.to streamSinkConfig
 
   mockStore <- mkMockTopicStore
@@ -95,10 +111,19 @@ main = do
             }
     runTask taskConfig task
 
-filterF :: Record TL.Text R -> Bool
-filterF Record {..} =
+filterR :: Record TL.Text R -> Bool
+filterR Record {..} =
   temperature recordValue >= 50
     && humidity recordValue >= 0
+
+mapR :: Record TL.Text R -> Record TL.Text R1
+mapR r@Record {..} =
+  r
+    { recordValue =
+        R1
+          { r1Temperature = temperature recordValue
+          }
+    }
 
 mkMockData :: IO MockMessage
 mkMockData = do
