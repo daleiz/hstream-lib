@@ -11,6 +11,7 @@ module HStream.Processor
     addSink,
     runTask,
     forward,
+    getStateStore,
     mkMockTopicStore,
     mkMockTopicConsumer,
     mkMockTopicProducer,
@@ -36,6 +37,7 @@ import Data.Dynamic
 import Data.Maybe
 import HStream.Error (HStreamError (..))
 import HStream.Processor.Internal
+import HStream.Store
 import HStream.Topic
 import RIO
 import qualified RIO.ByteString.Lazy as BL
@@ -88,7 +90,8 @@ buildTask = traced . buildTask'
               taskSourceConfig = sourceCfgs,
               taskSinkConfig = sinkCfgs,
               taskTopologyReversed = topology,
-              taskTopologyForward = topologyForward
+              taskTopologyForward = topologyForward,
+              taskStores = stores
             }
 
 validateTopology :: TaskTopologyConfig -> ()
@@ -212,6 +215,22 @@ addSink cfg@SinkConfig {..} parentNames builder =
               }
       }
 
+addStateStore ::
+  (Typeable k, Typeable v, Ord k) =>
+  T.Text ->
+  KVStore k v ->
+  [T.Text] ->
+  TaskBuilder ->
+  Task
+addStateStore storeName store processors builder =
+  runTraced builder $
+    mempty
+      { stores =
+          HM.singleton
+            storeName
+            (mkDKVStore store, HS.fromList processors)
+      }
+
 runTask ::
   TaskConfig ->
   Task ->
@@ -307,6 +326,21 @@ forward record = do
       else do
         let dr = dynProcessor `dynApp` toDyn record
         fromDyn dr (return () :: RIO TaskContext ())
+
+getStateStore ::
+  (Typeable k, Typeable v, Ord k) =>
+  T.Text ->
+  RIO TaskContext (KVStore k v)
+getStateStore storeName = do
+  ctx <- ask
+  curProcessorName <- readIORef $ curProcessor ctx
+  let taskInfo = taskConfig ctx
+  case HM.lookup storeName (taskStores taskInfo) of
+    Just (dstore, processors) ->
+      if HS.member curProcessorName processors
+        then return $ fromDKVStore dstore
+        else error "no state store found"
+    Nothing -> error "no state store found"
 
 dumbProcessor :: RIO TaskContext ()
 dumbProcessor = return ()

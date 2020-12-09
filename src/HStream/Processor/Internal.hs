@@ -19,14 +19,26 @@ import Control.Exception (throw)
 import Data.Default
 import Data.Dynamic
 import HStream.Error (HStreamError (..))
+import HStream.Store
 import RIO
 import qualified RIO.HashMap as HM
+import qualified RIO.HashSet as HS
 import qualified RIO.Text as T
 
 data TaskTopologyConfig = TaskTopologyConfig
   { sourceCfgs :: HM.HashMap T.Text InternalSourceConfig,
     topology :: HM.HashMap T.Text (Dynamic, [T.Text]),
-    sinkCfgs :: HM.HashMap T.Text InternalSinkConfig
+    sinkCfgs :: HM.HashMap T.Text InternalSinkConfig,
+    -- HM.HashMap storeName KeyValueStore
+    -- HM.HashMap storeName (KVStore s k v)
+    -- 如果不用 typeclass 如何在这里统一不同的 stateStore 呢？
+    -- 用 ADT 枚举所有支持的 stateStore ?
+    --
+    -- data KVStoreProvider k v
+    --   = InMemoryKVStore k v
+    --   | RocksDBKVStore k v
+    --
+    stores :: HM.HashMap T.Text (DKVStore, HS.HashSet T.Text)
   }
 
 instance Default TaskTopologyConfig where
@@ -34,7 +46,8 @@ instance Default TaskTopologyConfig where
     TaskTopologyConfig
       { sourceCfgs = HM.empty,
         topology = HM.empty,
-        sinkCfgs = HM.empty
+        sinkCfgs = HM.empty,
+        stores = HM.empty
       }
 
 instance Semigroup TaskTopologyConfig where
@@ -63,7 +76,15 @@ instance Semigroup TaskTopologyConfig where
                   TaskTopologyBuildError $ "sink named " `T.append` name `T.append` " already existed"
             )
             (sinkCfgs t1)
-            (sinkCfgs t2)
+            (sinkCfgs t2),
+        stores =
+          HM.unionWithKey
+            ( \name _ _ ->
+                throw $
+                  TaskTopologyBuildError $ "store named " `T.append` name `T.append` " already existed"
+            )
+            (stores t1)
+            (stores t2)
       }
 
 instance Monoid TaskTopologyConfig where
@@ -92,9 +113,9 @@ data Task = Task
     taskSourceConfig :: HM.HashMap T.Text InternalSourceConfig,
     taskTopologyReversed :: HM.HashMap T.Text (Dynamic, [T.Text]),
     taskTopologyForward :: HM.HashMap T.Text (Dynamic, [T.Text]),
-    taskSinkConfig :: HM.HashMap T.Text InternalSinkConfig
+    taskSinkConfig :: HM.HashMap T.Text InternalSinkConfig,
+    taskStores :: HM.HashMap T.Text (DKVStore, HS.HashSet T.Text)
   }
-  deriving (Show)
 
 data TaskContext = TaskContext
   { taskConfig :: Task,

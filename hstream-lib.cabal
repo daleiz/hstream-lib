@@ -24,6 +24,7 @@ library
                     , HStream.Processor.Internal 
                     , HStream.Topic
                     , HStream.Error
+                    , HStream.Store
                       
   build-depends:      base >=4.13 && <4.14
                     , rio
