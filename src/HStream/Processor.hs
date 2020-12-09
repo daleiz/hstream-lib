@@ -9,6 +9,7 @@ module HStream.Processor
     addSource,
     addProcessor,
     addSink,
+    addStateStore,
     runTask,
     forward,
     getStateStore,
@@ -131,7 +132,7 @@ addSource cfg@SourceConfig {..} builder =
             InternalSourceConfig
               { iSourceName = sourceName,
                 iSourceTopicName = sourceTopicName,
-                iKeyDeserializer = toDyn $ fmap runDeser keyDeserializer,
+                iKeyDeserializer = fmap (toDyn . runDeser) keyDeserializer,
                 iValueDeserializer = toDyn $ runDeser valueDeserializer
               },
         topology =
@@ -180,7 +181,9 @@ buildSinkProcessor ::
 buildSinkProcessor producer InternalSinkConfig {..} = Processor $ \Record {..} -> do
   -- serialize and write to topic
   logDebug "enter sink processor"
-  let rk = fmap (\x -> fromDyn (iKeySerializer `dynApp` x) BL.empty) recordKey
+  -- let rk = dynApp iKeySerializer <*> recordKey
+  let mrk = liftA2 dynApp iKeySerializer recordKey
+  let rk = fmap (`fromDyn` BL.empty) mrk
   let rv = fromDyn (iValueSerializer `dynApp` recordValue) BL.empty
   liftIO $
     send
@@ -197,7 +200,7 @@ addSink ::
   [T.Text] ->
   TaskBuilder ->
   Task
-addSink cfg@SinkConfig {..} parentNames builder =
+addSink SinkConfig {..} parentNames builder =
   runTraced builder $
     mempty
       { topology =
@@ -210,15 +213,15 @@ addSink cfg@SinkConfig {..} parentNames builder =
             InternalSinkConfig
               { iSinkName = sinkName,
                 iSinkTopicName = sinkTopicName,
-                iKeySerializer = toDyn $ fmap runSer keySerializer,
+                iKeySerializer = fmap (toDyn . runSer) keySerializer,
                 iValueSerializer = toDyn $ runSer valueSerializer
               }
       }
 
 addStateStore ::
-  (Typeable k, Typeable v, Ord k) =>
+  (Typeable k, Typeable v, Ord k, KVStore s) =>
   T.Text ->
-  KVStore k v ->
+  s k v ->
   [T.Text] ->
   TaskBuilder ->
   Task
@@ -228,14 +231,14 @@ addStateStore storeName store processors builder =
       { stores =
           HM.singleton
             storeName
-            (mkDKVStore store, HS.fromList processors)
+            (mkDEKVStore store, HS.fromList processors)
       }
 
 runTask ::
   TaskConfig ->
   Task ->
   IO ()
-runTask cfg@TaskConfig {..} task@Task {..} = do
+runTask TaskConfig {..} task@Task {..} = do
   topicConsumer <-
     case tcMessageStoreType of
       Mock mockStore -> mkMockTopicConsumer mockStore
@@ -330,15 +333,15 @@ forward record = do
 getStateStore ::
   (Typeable k, Typeable v, Ord k) =>
   T.Text ->
-  RIO TaskContext (KVStore k v)
+  RIO TaskContext (EKVStore k v)
 getStateStore storeName = do
   ctx <- ask
   curProcessorName <- readIORef $ curProcessor ctx
   let taskInfo = taskConfig ctx
   case HM.lookup storeName (taskStores taskInfo) of
-    Just (dstore, processors) ->
+    Just (deStore, processors) ->
       if HS.member curProcessorName processors
-        then return $ fromDKVStore dstore
+        then return $ fromDEKVStore deStore
         else error "no state store found"
     Nothing -> error "no state store found"
 

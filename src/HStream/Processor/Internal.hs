@@ -38,7 +38,7 @@ data TaskTopologyConfig = TaskTopologyConfig
     --   = InMemoryKVStore k v
     --   | RocksDBKVStore k v
     --
-    stores :: HM.HashMap T.Text (DKVStore, HS.HashSet T.Text)
+    stores :: HM.HashMap T.Text (DEKVStore, HS.HashSet T.Text)
   }
 
 instance Default TaskTopologyConfig where
@@ -93,7 +93,7 @@ instance Monoid TaskTopologyConfig where
 data InternalSourceConfig = InternalSourceConfig
   { iSourceName :: T.Text,
     iSourceTopicName :: T.Text,
-    iKeyDeserializer :: Dynamic,
+    iKeyDeserializer :: Maybe Dynamic,
     iValueDeserializer :: Dynamic
   }
   deriving (Show)
@@ -101,7 +101,7 @@ data InternalSourceConfig = InternalSourceConfig
 data InternalSinkConfig = InternalSinkConfig
   { iSinkName :: T.Text,
     iSinkTopicName :: T.Text,
-    iKeySerializer :: Dynamic,
+    iKeySerializer :: Maybe Dynamic,
     iValueSerializer :: Dynamic
   }
   deriving (Show)
@@ -114,7 +114,7 @@ data Task = Task
     taskTopologyReversed :: HM.HashMap T.Text (Dynamic, [T.Text]),
     taskTopologyForward :: HM.HashMap T.Text (Dynamic, [T.Text]),
     taskSinkConfig :: HM.HashMap T.Text InternalSinkConfig,
-    taskStores :: HM.HashMap T.Text (DKVStore, HS.HashSet T.Text)
+    taskStores :: HM.HashMap T.Text (DEKVStore, HS.HashSet T.Text)
   }
 
 data TaskContext = TaskContext

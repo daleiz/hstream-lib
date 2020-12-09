@@ -40,10 +40,10 @@ data RawConsumerRecord = RawConsumerRecord
     rcrTimestamp :: Timestamp,
     rcrKey :: Maybe BL.ByteString,
     rcrValue :: BL.ByteString
-  }
+  } deriving (Show)
 
 data RawProducerRecord = RawProducerRecord
   { rprTopic :: TopicName,
     rprKey :: Maybe BL.ByteString,
     rprValue :: BL.ByteString
-  }
+  } deriving (Show)
