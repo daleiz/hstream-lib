@@ -72,7 +72,7 @@ instance Monoid TaskTopologyConfig where
 data InternalSourceConfig = InternalSourceConfig
   { iSourceName :: T.Text,
     iSourceTopicName :: T.Text,
-    iKeyDeserializer :: Dynamic,
+    iKeyDeserializer :: Maybe Dynamic,
     iValueDeserializer :: Dynamic
   }
   deriving (Show)
@@ -80,7 +80,7 @@ data InternalSourceConfig = InternalSourceConfig
 data InternalSinkConfig = InternalSinkConfig
   { iSinkName :: T.Text,
     iSinkTopicName :: T.Text,
-    iKeySerializer :: Dynamic,
+    iKeySerializer :: Maybe Dynamic,
     iValueSerializer :: Dynamic
   }
   deriving (Show)

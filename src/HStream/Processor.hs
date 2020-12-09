@@ -128,7 +128,7 @@ addSource cfg@SourceConfig {..} builder =
             InternalSourceConfig
               { iSourceName = sourceName,
                 iSourceTopicName = sourceTopicName,
-                iKeyDeserializer = toDyn $ fmap runDeser keyDeserializer,
+                iKeyDeserializer = fmap (toDyn . runDeser) keyDeserializer,
                 iValueDeserializer = toDyn $ runDeser valueDeserializer
               },
         topology =
@@ -177,7 +177,8 @@ buildSinkProcessor ::
 buildSinkProcessor producer InternalSinkConfig {..} = Processor $ \Record {..} -> do
   -- serialize and write to topic
   logDebug "enter sink processor"
-  let rk = fmap (\x -> fromDyn (iKeySerializer `dynApp` x) BL.empty) recordKey
+  let mrk = liftA2 dynApp iKeySerializer recordKey
+  let rk = fmap (`fromDyn` BL.empty) mrk
   let rv = fromDyn (iValueSerializer `dynApp` recordValue) BL.empty
   liftIO $
     send
@@ -194,7 +195,7 @@ addSink ::
   [T.Text] ->
   TaskBuilder ->
   Task
-addSink cfg@SinkConfig {..} parentNames builder =
+addSink SinkConfig {..} parentNames builder =
   runTraced builder $
     mempty
       { topology =
@@ -207,7 +208,7 @@ addSink cfg@SinkConfig {..} parentNames builder =
             InternalSinkConfig
               { iSinkName = sinkName,
                 iSinkTopicName = sinkTopicName,
-                iKeySerializer = toDyn $ fmap runSer keySerializer,
+                iKeySerializer = fmap (toDyn . runSer) keySerializer,
                 iValueSerializer = toDyn $ runSer valueSerializer
               }
       }
@@ -216,7 +217,7 @@ runTask ::
   TaskConfig ->
   Task ->
   IO ()
-runTask cfg@TaskConfig {..} task@Task {..} = do
+runTask TaskConfig {..} task@Task {..} = do
   topicConsumer <-
     case tcMessageStoreType of
       Mock mockStore -> mkMockTopicConsumer mockStore
