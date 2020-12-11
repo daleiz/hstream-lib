@@ -1,4 +1,4 @@
 hstream-lib
 ===========
 
-for usage, see [example](example/Main.hs)
+for usage, see [example](example/)
