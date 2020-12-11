@@ -14,15 +14,10 @@ module HStream.Processor
     mkMockTopicStore,
     mkMockTopicConsumer,
     mkMockTopicProducer,
-    voidSerializer,
-    voidDeserializer,
     Record (..),
     Processor (..),
     SourceConfig (..),
     SinkConfig (..),
-    Deserializer (..),
-    Serializer (..),
-    Serde (..),
     TaskConfig (..),
     MessageStoreType (..),
     MockTopicStore (..),
@@ -32,8 +27,9 @@ where
 
 import Control.Comonad.Traced
 import Control.Exception (throw)
-import Data.Dynamic
 import Data.Maybe
+import Data.Typeable
+import HStream.Encoding
 import HStream.Error (HStreamError (..))
 import HStream.Processor.Internal
 import HStream.Topic
@@ -46,8 +42,6 @@ import qualified RIO.List as L
 import qualified RIO.Text as T
 
 -- import qualified Prelude as P
-
-newtype Processor kin vin = Processor {runP :: Record kin vin -> RIO TaskContext ()}
 
 build :: TaskBuilder -> Task
 build = extract
@@ -81,7 +75,7 @@ buildTask = traced . buildTask'
                         nacc
                         parentsName
               )
-              (HM.empty :: HM.HashMap T.Text (Dynamic, [T.Text]))
+              (HM.empty :: HM.HashMap T.Text (EProcessor, [T.Text]))
               topology
        in Task
             { taskName = taskName,
@@ -127,15 +121,12 @@ addSource cfg@SourceConfig {..} builder =
             sourceTopicName
             InternalSourceConfig
               { iSourceName = sourceName,
-                iSourceTopicName = sourceTopicName,
-                iKeyDeserializer = fmap (toDyn . runDeser) keyDeserializer,
-                iValueDeserializer = toDyn $ runDeser valueDeserializer
+                iSourceTopicName = sourceTopicName
               },
         topology =
           HM.singleton
             sourceName
-            (toDyn $ runP $ buildSourceProcessor cfg, [])
-            -- (toDyn dumbProcessor, [])
+            (mkEProcessor $ buildSourceProcessor cfg, [])
       }
 
 buildSourceProcessor ::
@@ -166,28 +157,62 @@ addProcessor ::
 addProcessor name processor parentNames builder =
   runTraced builder $
     mempty
-      { topology = HM.singleton name (toDyn $ runP processor, parentNames)
+      { topology = HM.singleton name (mkEProcessor processor, parentNames)
       }
 
 buildSinkProcessor ::
+  (Typeable k, Typeable v) =>
+  SinkConfig k v ->
+  Processor k v
+buildSinkProcessor SinkConfig {..} = Processor $ \Record {..} -> do
+  logDebug "enter sink processor"
+  let rk = liftA2 runSer keySerializer recordKey
+  let rv = runSer valueSerializer recordValue
+  forward Record {recordKey = rk, recordValue = rv}
+
+buildInternalSinkProcessor ::
   TopicProducer p =>
   p ->
   InternalSinkConfig ->
-  Processor Dynamic Dynamic
-buildSinkProcessor producer InternalSinkConfig {..} = Processor $ \Record {..} -> do
-  -- serialize and write to topic
-  logDebug "enter sink processor"
-  let mrk = liftA2 dynApp iKeySerializer recordKey
-  let rk = fmap (`fromDyn` BL.empty) mrk
-  let rv = fromDyn (iValueSerializer `dynApp` recordValue) BL.empty
+  Processor BL.ByteString BL.ByteString
+buildInternalSinkProcessor producer InternalSinkConfig {..} = Processor $ \Record {..} -> do
   liftIO $
     send
       producer
       RawProducerRecord
         { rprTopic = iSinkTopicName,
-          rprKey = rk,
-          rprValue = rv
+          rprKey = recordKey,
+          rprValue = recordValue
         }
+
+-- why this not work?
+-- can not deduce k v,
+-- 这没有理由啊，
+-- record 上肯定能执行 cast 操作的,
+-- 这里是否能 cast 成任意的值？
+-- 关键是下面也没有出现能推断 k v 类型的信息，
+-- 所有后半段没法成立.
+-- 反正要给后半段一个能推断出来的类型.
+-- 它这个类型信息其实就在 serializer 里面.
+--
+-- 所以必须留下未包装的 serailizer,
+-- 也就是在开始的时候就构建
+--
+--
+-- case cast record of
+--   Just Record {..} -> do
+--     -- serialize and write to topic
+--     logDebug "enter sink processor"
+--     let rk = liftA2 runESer iKeySerializer (fmap mkEV recordKey)
+--     let rv = runESer iValueSerializer (mkEV recordValue)
+--     liftIO $
+--       send
+--         producer
+--         RawProducerRecord
+--           { rprTopic = iSinkTopicName,
+--             rprKey = rk,
+--             rprValue = rv
+--           }
 
 addSink ::
   (Typeable k, Typeable v) =>
@@ -195,21 +220,19 @@ addSink ::
   [T.Text] ->
   TaskBuilder ->
   Task
-addSink SinkConfig {..} parentNames builder =
+addSink cfg@SinkConfig {..} parentNames builder =
   runTraced builder $
     mempty
       { topology =
           HM.singleton
             sinkName
-            (toDyn dumbProcessor, parentNames),
+            (mkEProcessor $ buildSinkProcessor cfg, parentNames),
         sinkCfgs =
           HM.singleton
             sinkName
             InternalSinkConfig
               { iSinkName = sinkName,
-                iSinkTopicName = sinkTopicName,
-                iKeySerializer = fmap (toDyn . runSer) keySerializer,
-                iValueSerializer = toDyn $ runSer valueSerializer
+                iSinkTopicName = sinkTopicName
               }
       }
 
@@ -229,13 +252,16 @@ runTask TaskConfig {..} task@Task {..} = do
       LogDevice -> throwIO $ UnSupportedMessageStoreError "LogDevice is not supported!"
       Kafka -> throwIO $ UnSupportedMessageStoreError "Kafka is not supported!"
 
-  -- build Sink Node
+  -- add InternalSink Node
   let newTaskTopologyForward =
         HM.foldlWithKey'
-          ( \a k v ->
-              let sp = buildSinkProcessor topicProducer v
-                  (_, parents) = taskTopologyForward HM'.! k
-               in HM.insert k (toDyn $ runP sp, parents) a
+          ( \a k v@InternalSinkConfig {..} ->
+              let internalSinkProcessor = buildInternalSinkProcessor topicProducer v
+                  ep = mkEProcessor internalSinkProcessor
+                  (sinkProcessor, children) = taskTopologyForward HM'.! k
+                  name = T.append iSinkTopicName "-INTERNAL-SINK"
+                  tp = HM.insert k (sinkProcessor, children ++ [name]) a
+               in HM.insert name (ep, []) tp
           )
           taskTopologyForward
           taskSinkConfig
@@ -253,9 +279,8 @@ runTask TaskConfig {..} task@Task {..} = do
         rawRecords
         ( \RawConsumerRecord {..} -> do
             let acSourceName = iSourceName (taskSourceConfig HM'.! rcrTopic)
-            let (ds, _) = newTaskTopologyForward HM'.! acSourceName
-            let dr = ds `dynApp` toDyn Record {recordKey = rcrKey, recordValue = rcrValue}
-            fromDyn dr (return () :: RIO TaskContext ())
+            let (sourceEProcessor, _) = newTaskTopologyForward HM'.! acSourceName
+            runEP sourceEProcessor (mkERecord Record {recordKey = rcrKey, recordValue = rcrValue})
         )
 
 data TaskConfig = TaskConfig
@@ -276,11 +301,6 @@ mkMockTopicStore = do
       { mtsData = s
       }
 
-data Record k v = Record
-  { recordKey :: Maybe k,
-    recordValue :: v
-  }
-
 forward ::
   (Typeable k, Typeable v) =>
   Record k v ->
@@ -295,37 +315,24 @@ forward record = do
   for_ children $ \cname -> do
     logDebug $ "forward to child: " <> display cname
     writeIORef (curProcessor ctx) cname
-    let (dynProcessor, _) = tplgy HM'.! cname
-    if isSink (taskSinkConfig taskInfo) cname
-      then do
-        let dumbSinkProcessor = (\_ -> return ()) :: Record Dynamic Dynamic -> RIO TaskContext ()
-        let proc = fromDyn dynProcessor dumbSinkProcessor
-        proc
-          Record
-            { recordKey = toDyn <$> recordKey record,
-              recordValue = toDyn $ recordValue record
-            }
-      else do
-        let dr = dynProcessor `dynApp` toDyn record
-        fromDyn dr (return () :: RIO TaskContext ())
+    let (eProcessor, _) = tplgy HM'.! cname
+    runEP eProcessor (mkERecord record)
 
-dumbProcessor :: RIO TaskContext ()
-dumbProcessor = return ()
+-- if isSink (taskSinkConfig taskInfo) cname
+--   then do
+--     let dumbSinkProcessor = (\_ -> return ()) :: Record Dynamic Dynamic -> RIO TaskContext ()
+--     let proc = fromDyn dynProcessor dumbSinkProcessor
+--     proc
+--       Record
+--         { recordKey = toDyn <$> recordKey record,
+--           recordValue = toDyn $ recordValue record
+--         }
+--   else do
+--     let dr = dynProcessor `dynApp` toDyn record
+--     fromDyn dr (return () :: RIO TaskContext ())
 
-newtype Deserializer a = Deserializer {runDeser :: BL.ByteString -> a}
-
-newtype Serializer a = Serializer {runSer :: a -> BL.ByteString}
-
-voidDeserializer :: Maybe (Deserializer Void)
-voidDeserializer = Nothing
-
-voidSerializer :: Maybe (Serializer Void)
-voidSerializer = Nothing
-
-data Serde a = Serde
-  { serializer :: Serializer a,
-    deserializer :: Deserializer a
-  }
+-- dumbProcessor :: EProcessor
+-- dumbProcessor = mkEProcessor $ return ()
 
 data MockMessage = MockMessage
   { mmTimestamp :: Timestamp,

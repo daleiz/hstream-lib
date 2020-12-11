@@ -9,6 +9,7 @@ import Data.Aeson
 import Data.Maybe
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
+import HStream.Encoding
 import HStream.Processor
 import HStream.Topic
 import RIO

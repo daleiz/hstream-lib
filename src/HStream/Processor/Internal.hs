@@ -1,31 +1,45 @@
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module HStream.Processor.Internal
-  ( TaskBuilder,
-    TaskTopologyConfig (..),
-    TaskContext (..),
-    Task (..),
-    InternalSourceConfig (..),
-    InternalSinkConfig (..),
-    buildTaskContext,
-    isSink,
-  )
-where
+module HStream.Processor.Internal where
 
 import Control.Comonad.Traced
 import Control.Exception (throw)
 import Data.Default
-import Data.Dynamic
+import Data.Typeable
 import HStream.Error (HStreamError (..))
 import RIO
 import qualified RIO.HashMap as HM
 import qualified RIO.Text as T
 
+newtype Processor kin vin = Processor {runP :: Record kin vin -> RIO TaskContext ()}
+
+newtype EProcessor = EProcessor {runEP :: ERecord -> RIO TaskContext ()}
+
+mkEProcessor ::
+  (Typeable k, Typeable v) =>
+  Processor k v ->
+  EProcessor
+mkEProcessor proc = EProcessor $ \(ERecord record) ->
+  case cast record of
+    Just r -> runP proc r
+    Nothing -> throw $ TypeCastError "mkEProcessor: type cast error"
+
+data Record k v = Record
+  { recordKey :: Maybe k,
+    recordValue :: v
+  }
+
+data ERecord = forall k v. (Typeable k, Typeable v) => ERecord (Record k v)
+
+mkERecord :: (Typeable k, Typeable v) => Record k v -> ERecord
+mkERecord = ERecord
+
 data TaskTopologyConfig = TaskTopologyConfig
   { sourceCfgs :: HM.HashMap T.Text InternalSourceConfig,
-    topology :: HM.HashMap T.Text (Dynamic, [T.Text]),
+    topology :: HM.HashMap T.Text (EProcessor, [T.Text]),
     sinkCfgs :: HM.HashMap T.Text InternalSinkConfig
   }
 
@@ -71,30 +85,23 @@ instance Monoid TaskTopologyConfig where
 
 data InternalSourceConfig = InternalSourceConfig
   { iSourceName :: T.Text,
-    iSourceTopicName :: T.Text,
-    iKeyDeserializer :: Maybe Dynamic,
-    iValueDeserializer :: Dynamic
+    iSourceTopicName :: T.Text
   }
-  deriving (Show)
 
 data InternalSinkConfig = InternalSinkConfig
   { iSinkName :: T.Text,
-    iSinkTopicName :: T.Text,
-    iKeySerializer :: Maybe Dynamic,
-    iValueSerializer :: Dynamic
+    iSinkTopicName :: T.Text
   }
-  deriving (Show)
 
 type TaskBuilder = Traced TaskTopologyConfig Task
 
 data Task = Task
   { taskName :: T.Text,
     taskSourceConfig :: HM.HashMap T.Text InternalSourceConfig,
-    taskTopologyReversed :: HM.HashMap T.Text (Dynamic, [T.Text]),
-    taskTopologyForward :: HM.HashMap T.Text (Dynamic, [T.Text]),
+    taskTopologyReversed :: HM.HashMap T.Text (EProcessor, [T.Text]),
+    taskTopologyForward :: HM.HashMap T.Text (EProcessor, [T.Text]),
     taskSinkConfig :: HM.HashMap T.Text InternalSinkConfig
   }
-  deriving (Show)
 
 data TaskContext = TaskContext
   { taskConfig :: Task,
@@ -117,6 +124,3 @@ buildTaskContext task lf = do
         tctLogFunc = lf,
         curProcessor = ref
       }
-
-isSink :: HashMap T.Text InternalSinkConfig -> T.Text -> Bool
-isSink cfgs curName = HM.member curName cfgs
