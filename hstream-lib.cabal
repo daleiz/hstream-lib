@@ -24,6 +24,7 @@ library
                     , HStream.Processor.Internal 
                     , HStream.Topic
                     , HStream.Error
+                    , HStream.Encoding
                       
   build-depends:      base
                     , rio
