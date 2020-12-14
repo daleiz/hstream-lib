@@ -9,8 +9,10 @@ module HStream.Processor
     addSource,
     addProcessor,
     addSink,
+    addStateStore,
     runTask,
     forward,
+    getStateStore,
     mkMockTopicStore,
     mkMockTopicConsumer,
     mkMockTopicProducer,
@@ -32,6 +34,7 @@ import Data.Typeable
 import HStream.Encoding
 import HStream.Error (HStreamError (..))
 import HStream.Processor.Internal
+import HStream.Store
 import HStream.Topic
 import RIO
 import qualified RIO.ByteString.Lazy as BL
@@ -82,7 +85,8 @@ buildTask = traced . buildTask'
               taskSourceConfig = sourceCfgs,
               taskSinkConfig = sinkCfgs,
               taskTopologyReversed = topology,
-              taskTopologyForward = topologyForward
+              taskTopologyForward = topologyForward,
+              taskStores = stores
             }
 
 validateTopology :: TaskTopologyConfig -> ()
@@ -236,6 +240,22 @@ addSink cfg@SinkConfig {..} parentNames builder =
               }
       }
 
+addStateStore ::
+  (Typeable k, Typeable v, Ord k, KVStore s) =>
+  T.Text ->
+  s k v ->
+  [T.Text] ->
+  TaskBuilder ->
+  Task
+addStateStore storeName store processors builder =
+  runTraced builder $
+    mempty
+      { stores =
+          HM.singleton
+            storeName
+            (mkDEKVStore store, HS.fromList processors)
+      }
+
 runTask ::
   TaskConfig ->
   Task ->
@@ -318,21 +338,20 @@ forward record = do
     let (eProcessor, _) = tplgy HM'.! cname
     runEP eProcessor (mkERecord record)
 
--- if isSink (taskSinkConfig taskInfo) cname
---   then do
---     let dumbSinkProcessor = (\_ -> return ()) :: Record Dynamic Dynamic -> RIO TaskContext ()
---     let proc = fromDyn dynProcessor dumbSinkProcessor
---     proc
---       Record
---         { recordKey = toDyn <$> recordKey record,
---           recordValue = toDyn $ recordValue record
---         }
---   else do
---     let dr = dynProcessor `dynApp` toDyn record
---     fromDyn dr (return () :: RIO TaskContext ())
-
--- dumbProcessor :: EProcessor
--- dumbProcessor = mkEProcessor $ return ()
+getStateStore ::
+  (Typeable k, Typeable v, Ord k) =>
+  T.Text ->
+  RIO TaskContext (EKVStore k v)
+getStateStore storeName = do
+  ctx <- ask
+  curProcessorName <- readIORef $ curProcessor ctx
+  let taskInfo = taskConfig ctx
+  case HM.lookup storeName (taskStores taskInfo) of
+    Just (deStore, processors) ->
+      if HS.member curProcessorName processors
+        then return $ fromDEKVStore deStore
+        else error "no state store found"
+    Nothing -> error "no state store found"
 
 data MockMessage = MockMessage
   { mmTimestamp :: Timestamp,

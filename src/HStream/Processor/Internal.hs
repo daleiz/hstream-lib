@@ -10,8 +10,10 @@ import Control.Exception (throw)
 import Data.Default
 import Data.Typeable
 import HStream.Error (HStreamError (..))
+import HStream.Store
 import RIO
 import qualified RIO.HashMap as HM
+import qualified RIO.HashSet as HS
 import qualified RIO.Text as T
 
 newtype Processor kin vin = Processor {runP :: Record kin vin -> RIO TaskContext ()}
@@ -40,7 +42,8 @@ mkERecord = ERecord
 data TaskTopologyConfig = TaskTopologyConfig
   { sourceCfgs :: HM.HashMap T.Text InternalSourceConfig,
     topology :: HM.HashMap T.Text (EProcessor, [T.Text]),
-    sinkCfgs :: HM.HashMap T.Text InternalSinkConfig
+    sinkCfgs :: HM.HashMap T.Text InternalSinkConfig,
+    stores :: HM.HashMap T.Text (DEKVStore, HS.HashSet T.Text)
   }
 
 instance Default TaskTopologyConfig where
@@ -48,7 +51,8 @@ instance Default TaskTopologyConfig where
     TaskTopologyConfig
       { sourceCfgs = HM.empty,
         topology = HM.empty,
-        sinkCfgs = HM.empty
+        sinkCfgs = HM.empty,
+        stores = HM.empty
       }
 
 instance Semigroup TaskTopologyConfig where
@@ -77,7 +81,15 @@ instance Semigroup TaskTopologyConfig where
                   TaskTopologyBuildError $ "sink named " `T.append` name `T.append` " already existed"
             )
             (sinkCfgs t1)
-            (sinkCfgs t2)
+            (sinkCfgs t2),
+        stores =
+          HM.unionWithKey
+            ( \name _ _ ->
+                throw $
+                  TaskTopologyBuildError $ "store named " `T.append` name `T.append` " already existed"
+            )
+            (stores t1)
+            (stores t2)
       }
 
 instance Monoid TaskTopologyConfig where
@@ -100,7 +112,8 @@ data Task = Task
     taskSourceConfig :: HM.HashMap T.Text InternalSourceConfig,
     taskTopologyReversed :: HM.HashMap T.Text (EProcessor, [T.Text]),
     taskTopologyForward :: HM.HashMap T.Text (EProcessor, [T.Text]),
-    taskSinkConfig :: HM.HashMap T.Text InternalSinkConfig
+    taskSinkConfig :: HM.HashMap T.Text InternalSinkConfig,
+    taskStores :: HM.HashMap T.Text (DEKVStore, HS.HashSet T.Text)
   }
 
 data TaskContext = TaskContext
