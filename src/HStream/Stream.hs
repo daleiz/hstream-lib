@@ -5,7 +5,8 @@
 
 module HStream.Stream
   ( mkStreamBuilder,
-    from,
+    HStream.Stream.stream,
+    HStream.Stream.build,
     HStream.Stream.to,
     HStream.Stream.filter,
     HStream.Stream.map,
@@ -16,11 +17,10 @@ module HStream.Stream
   )
 where
 
-import Control.Comonad.Traced
-import Data.Dynamic
 import HStream.Encoding
 import HStream.Processor
 import HStream.Processor.Internal
+import HStream.Stream.Internal
 import HStream.Topic
 import RIO
 import qualified RIO.Text as T
@@ -29,22 +29,17 @@ data Stream k v = Stream
   { streamKeySerde :: Maybe (Serde k),
     streamValueSerde :: Maybe (Serde v),
     streamProcessorName :: T.Text,
-    streamStreamBuilder :: StreamBuilder
+    streamInternalBuilder :: InternalStreamBuilder
   }
 
 data StreamBuilder = StreamBuilder
-  { sbTaskBuilder :: TaskBuilder,
-    sbProcessorIndex :: IORef Int
+  { sbInternalBuilder :: InternalStreamBuilder
   }
 
 mkStreamBuilder :: T.Text -> IO StreamBuilder
 mkStreamBuilder taskName = do
-  index <- newIORef 0
-  return $
-    StreamBuilder
-      { sbTaskBuilder = buildTask taskName,
-        sbProcessorIndex = index
-      }
+  internalStreamBuilder <- mkInternalStreamBuilder $ buildTask taskName
+  return StreamBuilder {sbInternalBuilder = internalStreamBuilder}
 
 data StreamSourceConfig k v = StreamSourceConfig
   { sscTopicName :: TopicName,
@@ -58,13 +53,13 @@ data StreamSinkConfig k v = StreamSinkConfig
     sicValueSerde :: Serde v
   }
 
-from ::
+stream ::
   (Typeable k, Typeable v) =>
   StreamSourceConfig k v ->
   StreamBuilder ->
   IO (Stream k v)
-from StreamSourceConfig {..} sb@StreamBuilder {..} = do
-  sourceProcessorName <- mkInternalProcessorName (sscTopicName `T.append` "-SOURCE-") sbProcessorIndex
+stream StreamSourceConfig {..} StreamBuilder {..} = do
+  sourceProcessorName <- mkInternalProcessorName (sscTopicName `T.append` "-SOURCE-") sbInternalBuilder
   let sourceCfg =
         SourceConfig
           { sourceName = sourceProcessorName,
@@ -72,27 +67,22 @@ from StreamSourceConfig {..} sb@StreamBuilder {..} = do
             keyDeserializer = Just $ deserializer sscKeySerde,
             valueDeserializer = deserializer sscValueSerde
           }
-
-  let taskBuilder = sbTaskBuilder =>> addSource sourceCfg
+  newBuilder <- addSourceInternal sourceCfg sbInternalBuilder
   return
     Stream
       { streamKeySerde = Just sscKeySerde,
         streamValueSerde = Just sscValueSerde,
         streamProcessorName = sourceProcessorName,
-        streamStreamBuilder =
-          sb
-            { sbTaskBuilder = taskBuilder
-            }
+        streamInternalBuilder = newBuilder
       }
 
 to ::
   (Typeable k, Typeable v) =>
   StreamSinkConfig k v ->
   Stream k v ->
-  IO Task
+  IO StreamBuilder
 to StreamSinkConfig {..} Stream {..} = do
-  let sb = streamStreamBuilder
-  sinkProcessorName <- mkInternalProcessorName (sicTopicName `T.append` "-SINK-") (sbProcessorIndex sb)
+  sinkProcessorName <- mkInternalProcessorName (sicTopicName `T.append` "-SINK-") streamInternalBuilder
   let sinkCfg =
         SinkConfig
           { sinkName = sinkProcessorName,
@@ -100,28 +90,24 @@ to StreamSinkConfig {..} Stream {..} = do
             keySerializer = Just $ serializer sicKeySerde,
             valueSerializer = serializer sicValueSerde
           }
-  let taskBuilder = sbTaskBuilder streamStreamBuilder =>> addSink sinkCfg [streamProcessorName]
-  return $ build taskBuilder
+  newBuilder <- addSinkInternal sinkCfg [streamProcessorName] streamInternalBuilder
+  return $ StreamBuilder {sbInternalBuilder = newBuilder}
 
-mkInternalProcessorName :: T.Text -> IORef Int -> IO T.Text
-mkInternalProcessorName namePrefix indexRef = do
-  index <- readIORef indexRef
-  writeIORef indexRef (index + 1)
-  return $ namePrefix `T.append` T.pack (show index)
+build :: StreamBuilder -> Task
+build StreamBuilder {..} = buildInternal sbInternalBuilder
 
 filter ::
   (Typeable k, Typeable v) =>
   (Record k v -> Bool) ->
   Stream k v ->
   IO (Stream k v)
-filter f stream@Stream {..} = do
-  name <- mkInternalProcessorName "FILTER-" (sbProcessorIndex streamStreamBuilder)
+filter f s@Stream {..} = do
+  name <- mkInternalProcessorName "FILTER-" streamInternalBuilder
   let p = filterProcessor f
-  let taskBuilder' = sbTaskBuilder streamStreamBuilder
-  let taskBuilder = taskBuilder' =>> addProcessor name p [streamProcessorName]
+  newBuilder <- addProcessorInternal name p [streamProcessorName] streamInternalBuilder
   return
-    stream
-      { streamStreamBuilder = streamStreamBuilder {sbTaskBuilder = taskBuilder},
+    s
+      { streamInternalBuilder = newBuilder,
         streamProcessorName = name
       }
 
@@ -143,14 +129,13 @@ map ::
   (Record k1 v1 -> Record k2 v2) ->
   Stream k1 v1 ->
   IO (Stream k2 v2)
-map f stream@Stream {..} = do
-  name <- mkInternalProcessorName "MAP-" (sbProcessorIndex streamStreamBuilder)
+map f s@Stream {..} = do
+  name <- mkInternalProcessorName "MAP-" streamInternalBuilder
   let p = mapProcessor f
-  let taskBuilder' = sbTaskBuilder streamStreamBuilder
-  let taskBuilder = taskBuilder' =>> addProcessor name p [streamProcessorName]
+  newBuilder <- addProcessorInternal name p [streamProcessorName] streamInternalBuilder
   return
-    stream
-      { streamStreamBuilder = streamStreamBuilder {sbTaskBuilder = taskBuilder},
+    s
+      { streamInternalBuilder = newBuilder,
         streamProcessorName = name,
         streamKeySerde = Nothing,
         streamValueSerde = Nothing

@@ -57,7 +57,7 @@ main = do
   mp <- mkMockTopicProducer mockStore
   mc' <- mkMockTopicConsumer mockStore
 
-  async $
+  _ <- async $
     forever $ do
       threadDelay 1000000
       MockMessage {..} <- mkMockData
@@ -70,7 +70,7 @@ main = do
           }
 
   mc <- subscribe mc' ["demo-sink"]
-  async $
+  _ <- async $
     forever $ do
       records <- pollRecords mc 1000000
       forM_ records $ \RawConsumerRecord {..} ->

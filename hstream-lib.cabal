@@ -26,6 +26,7 @@ library
                     , HStream.Error
                     , HStream.Encoding
                     , HStream.Stream
+                    , HStream.Stream.Internal
                     , HStream.Store
                       
   build-depends:      base
@@ -33,6 +34,7 @@ library
                     , comonad 
                     , data-default 
                     , template-haskell
+  ghc-options:        -Wall
 
 executable processor-example0 
   default-language:   Haskell2010
@@ -45,6 +47,7 @@ executable processor-example0
                     , random
                     , text
                     , hstream-lib 
+  ghc-options:        -Wall
 
 executable processor-example1 
   default-language:   Haskell2010
@@ -58,6 +61,7 @@ executable processor-example1
                     , text
                     , hstream-lib 
                     , binary
+  ghc-options:        -Wall
 
 executable stream-example0 
   default-language:   Haskell2010
@@ -70,3 +74,4 @@ executable stream-example0
                     , random
                     , text
                     , hstream-lib
+  ghc-options:        -Wall

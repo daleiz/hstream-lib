@@ -73,9 +73,9 @@ main = do
             sicValueSerde = r1Serde
           }
 
-  task <-
+  streamBuilder <-
     HS.mkStreamBuilder "demo"
-      >>= HS.from streamSourceConfig
+      >>= HS.stream streamSourceConfig
       >>= HS.filter filterR
       >>= HS.map mapR
       >>= HS.to streamSinkConfig
@@ -84,7 +84,7 @@ main = do
   mp <- mkMockTopicProducer mockStore
   mc' <- mkMockTopicConsumer mockStore
 
-  async $
+  _ <- async $
     forever $ do
       threadDelay 1000000
       MockMessage {..} <- mkMockData
@@ -97,7 +97,7 @@ main = do
           }
 
   mc <- subscribe mc' ["demo-sink"]
-  async $
+  _ <- async $
     forever $ do
       records <- pollRecords mc 1000000
       forM_ records $ \RawConsumerRecord {..} ->
@@ -110,7 +110,7 @@ main = do
             { tcMessageStoreType = Mock mockStore,
               tcLogFunc = lf
             }
-    runTask taskConfig task
+    runTask taskConfig (HS.build streamBuilder)
 
 filterR :: Record TL.Text R -> Bool
 filterR Record {..} =
