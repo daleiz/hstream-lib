@@ -345,6 +345,7 @@ getStateStore ::
 getStateStore storeName = do
   ctx <- ask
   curProcessorName <- readIORef $ curProcessor ctx
+  logDebug $ display curProcessorName <> " ready to get state store " <> display storeName
   let taskInfo = taskConfig ctx
   case HM.lookup storeName (taskStores taskInfo) of
     Just (deStore, processors) ->

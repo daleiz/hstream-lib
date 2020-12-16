@@ -1,23 +1,54 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module HStream.Stream.Internal
   ( InternalStreamBuilder,
+    Stream (..),
+    Materialized (..),
+    mkStream,
     mkInternalStreamBuilder,
     mkInternalProcessorName,
+    mkInternalStoreName,
     addSourceInternal,
     addProcessorInternal,
     addSinkInternal,
+    addStateStoreInternal,
     buildInternal,
   )
 where
 
 import Control.Comonad ((=>>))
+import HStream.Encoding
 import HStream.Processor
 import HStream.Processor.Internal
+import HStream.Store
 import RIO
+import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Text as T
+
+data Stream k v = Stream
+  { streamKeySerde :: Maybe (Serde k),
+    streamValueSerde :: Maybe (Serde v),
+    streamProcessorName :: T.Text,
+    streamInternalBuilder :: InternalStreamBuilder
+  }
+
+mkStream ::
+  (Typeable k, Typeable v) =>
+  Maybe (Serde k) ->
+  Maybe (Serde v) ->
+  T.Text ->
+  InternalStreamBuilder ->
+  Stream k v
+mkStream keySerde valueSerde processorName builder =
+  Stream
+    { streamKeySerde = keySerde,
+      streamValueSerde = valueSerde,
+      streamProcessorName = processorName,
+      streamInternalBuilder = builder
+    }
 
 data InternalStreamBuilder = InternalStreamBuilder
   { isbTaskBuilder :: TaskBuilder,
@@ -66,6 +97,18 @@ addSinkInternal sinkCfg parents builder@InternalStreamBuilder {..} = do
   return
     builder {isbTaskBuilder = taskBuilder}
 
+addStateStoreInternal ::
+  (Typeable k, Typeable v, Ord k, KVStore s) =>
+  T.Text ->
+  s k v ->
+  [T.Text] ->
+  InternalStreamBuilder ->
+  IO InternalStreamBuilder
+addStateStoreInternal storeName store processors builder@InternalStreamBuilder {..} = do
+  let taskBuilder = isbTaskBuilder =>> addStateStore storeName store processors
+  return
+    builder {isbTaskBuilder = taskBuilder}
+
 buildInternal :: InternalStreamBuilder -> Task
 buildInternal InternalStreamBuilder {..} = build isbTaskBuilder
 
@@ -74,3 +117,13 @@ mkInternalProcessorName namePrefix InternalStreamBuilder {..} = do
   index <- readIORef isbProcessorId
   writeIORef isbProcessorId (index + 1)
   return $ namePrefix `T.append` T.pack (show index)
+
+mkInternalStoreName :: T.Text -> T.Text
+mkInternalStoreName namePrefix =
+  namePrefix `T.append` "-STORE"
+
+data Materialized k v s = Materialized
+  { mKeySerde :: Serde k,
+    mValueSerde :: Serde v,
+    mStateStore :: s BL.ByteString BL.ByteString
+  }

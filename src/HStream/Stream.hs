@@ -5,32 +5,30 @@
 
 module HStream.Stream
   ( mkStreamBuilder,
+    mkStream,
     HStream.Stream.stream,
     HStream.Stream.build,
     HStream.Stream.to,
     HStream.Stream.filter,
     HStream.Stream.map,
+    HStream.Stream.groupBy,
     Stream,
     StreamBuilder,
     StreamSourceConfig (..),
     StreamSinkConfig (..),
+    GroupedStream,
+    Materialized (..),
   )
 where
 
 import HStream.Encoding
 import HStream.Processor
 import HStream.Processor.Internal
+import HStream.Stream.GroupedStream
 import HStream.Stream.Internal
 import HStream.Topic
 import RIO
 import qualified RIO.Text as T
-
-data Stream k v = Stream
-  { streamKeySerde :: Maybe (Serde k),
-    streamValueSerde :: Maybe (Serde v),
-    streamProcessorName :: T.Text,
-    streamInternalBuilder :: InternalStreamBuilder
-  }
 
 data StreamBuilder = StreamBuilder
   { sbInternalBuilder :: InternalStreamBuilder
@@ -139,4 +137,21 @@ map f s@Stream {..} = do
         streamProcessorName = name,
         streamKeySerde = Nothing,
         streamValueSerde = Nothing
+      }
+
+groupBy ::
+  (Typeable k1, Typeable v1, Typeable k2) =>
+  (Record k1 v1 -> k2) ->
+  Stream k1 v1 ->
+  IO (GroupedStream k2 v1)
+groupBy f Stream {..} = do
+  name <- mkInternalProcessorName "GROUP-BY-" streamInternalBuilder
+  let p = mapProcessor (\r -> r {recordKey = Just $ f r})
+  newBuilder <- addProcessorInternal name p [streamProcessorName] streamInternalBuilder
+  return
+    GroupedStream
+      { gsInternalBuilder = newBuilder,
+        gsProcessorName = name,
+        gsKeySerde = Nothing,
+        gsValueSerde = Nothing
       }
