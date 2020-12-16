@@ -79,7 +79,7 @@ main = do
       >>= HS.stream streamSourceConfig
       >>= HS.filter filterR
       >>= HS.groupBy (fromJust . recordKey)
-      >>= HG.aggregate 0 countR materialized
+      >>= HG.count materialized
       >>= HT.toStream
       >>= HS.to streamSinkConfig
 
@@ -124,9 +124,6 @@ filterR :: Record TL.Text R -> Bool
 filterR Record {..} =
   temperature recordValue >= 50
     && humidity recordValue >= 0
-
-countR :: Int -> Record TL.Text R -> Int
-countR acc _ = acc + 1
 
 mkMockData :: IO MockMessage
 mkMockData = do

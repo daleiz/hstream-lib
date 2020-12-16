@@ -6,6 +6,7 @@
 module HStream.Stream.GroupedStream
   ( GroupedStream (..),
     aggregate,
+    count,
   )
 where
 
@@ -45,6 +46,16 @@ aggregate initialValue aggF Materialized {..} GroupedStream {..} = do
         tableKeySerde = Just mKeySerde,
         tableValueSerde = Just mValueSerde
       }
+
+count ::
+  (Typeable k, Typeable v, Ord k, KVStore s) =>
+  Materialized k Int s ->
+  GroupedStream k v ->
+  IO (Table k Int)
+count materialized groupedStream = aggregate 0 aggF materialized groupedStream
+  where
+    aggF :: Int -> Record k v -> Int
+    aggF acc _ = acc + 1
 
 aggregateProcessor ::
   (Typeable k, Typeable v, Ord k, Typeable a) =>
