@@ -36,6 +36,7 @@ import HStream.Error (HStreamError (..))
 import HStream.Processor.Internal
 import HStream.Store
 import HStream.Topic
+import HStream.Util
 import RIO
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.HashMap as HM
@@ -137,7 +138,7 @@ buildSourceProcessor ::
   (Typeable k, Typeable v) =>
   SourceConfig k v ->
   Processor BL.ByteString BL.ByteString
-buildSourceProcessor SourceConfig {..} = Processor $ \Record {..} -> do
+buildSourceProcessor SourceConfig {..} = Processor $ \r@Record {..} -> do
   -- deserialize and forward
   logDebug "enter source processor"
   ctx <- ask
@@ -145,7 +146,7 @@ buildSourceProcessor SourceConfig {..} = Processor $ \Record {..} -> do
   let rk = fmap runDeser keyDeserializer <*> recordKey
   let rv = runDeser valueDeserializer recordValue
   let rr =
-        Record
+        r
           { recordKey = rk,
             recordValue = rv
           }
@@ -168,11 +169,11 @@ buildSinkProcessor ::
   (Typeable k, Typeable v) =>
   SinkConfig k v ->
   Processor k v
-buildSinkProcessor SinkConfig {..} = Processor $ \Record {..} -> do
+buildSinkProcessor SinkConfig {..} = Processor $ \r@Record {..} -> do
   logDebug "enter sink processor"
   let rk = liftA2 runSer keySerializer recordKey
   let rv = runSer valueSerializer recordValue
-  forward Record {recordKey = rk, recordValue = rv}
+  forward r {recordKey = rk, recordValue = rv}
 
 buildInternalSinkProcessor ::
   TopicProducer p =>
@@ -180,13 +181,15 @@ buildInternalSinkProcessor ::
   InternalSinkConfig ->
   Processor BL.ByteString BL.ByteString
 buildInternalSinkProcessor producer InternalSinkConfig {..} = Processor $ \Record {..} -> do
+  ts <- liftIO getCurrentTimestamp
   liftIO $
     send
       producer
       RawProducerRecord
         { rprTopic = iSinkTopicName,
           rprKey = recordKey,
-          rprValue = recordValue
+          rprValue = recordValue,
+          rprTimestamp = ts
         }
 
 -- why this not work?
@@ -300,7 +303,8 @@ runTask TaskConfig {..} task@Task {..} = do
         ( \RawConsumerRecord {..} -> do
             let acSourceName = iSourceName (taskSourceConfig HM'.! rcrTopic)
             let (sourceEProcessor, _) = newTaskTopologyForward HM'.! acSourceName
-            runEP sourceEProcessor (mkERecord Record {recordKey = rcrKey, recordValue = rcrValue})
+            liftIO $ updateTimestampInTaskContext ctx rcrTimestamp
+            runEP sourceEProcessor (mkERecord Record {recordKey = rcrKey, recordValue = rcrValue, recordTimestamp = rcrTimestamp})
         )
 
 data TaskConfig = TaskConfig
@@ -436,7 +440,7 @@ instance TopicProducer MockTopicProducer where
     atomically $ do
       let record =
             MockMessage
-              { mmTimestamp = 0,
+              { mmTimestamp = rprTimestamp,
                 mmKey = rprKey,
                 mmValue = rprValue
               }

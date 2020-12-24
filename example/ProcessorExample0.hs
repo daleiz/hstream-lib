@@ -12,6 +12,7 @@ import qualified Data.Text.Lazy.Encoding as TLE
 import HStream.Encoding
 import HStream.Processor
 import HStream.Topic
+import HStream.Util
 import RIO
 import qualified RIO.ByteString.Lazy as BL
 import System.Random
@@ -66,7 +67,8 @@ main = do
         RawProducerRecord
           { rprTopic = "demo-source",
             rprKey = mmKey,
-            rprValue = mmValue
+            rprValue = mmValue,
+            rprTimestamp = mmTimestamp
           }
 
   mc <- subscribe mc' ["demo-sink"]
@@ -97,9 +99,10 @@ mkMockData = do
   h <- getStdRandom (randomR (0, 100))
   let r = R {temperature = t, humidity = h}
   P.putStrLn $ "gen data: " ++ show r
+  ts <- getCurrentTimestamp
   return
     MockMessage
-      { mmTimestamp = 0,
+      { mmTimestamp = ts,
         mmKey = Just $ TLE.encodeUtf8 $ TL.pack $ show k,
         mmValue = encode $ R {temperature = t, humidity = h}
       }

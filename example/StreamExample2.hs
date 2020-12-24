@@ -5,16 +5,21 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 import Data.Aeson
+import qualified Data.Binary as B
 import Data.Maybe
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
 import HStream.Encoding
 import HStream.Processor
+import HStream.Store
 import qualified HStream.Stream as HS
+import qualified HStream.Stream.GroupedStream as HG
+import qualified HStream.Stream.TimeWindowedStream as HTW
+import HStream.Stream.TimeWindows
+import qualified HStream.Table as HT
 import HStream.Topic
 import HStream.Util
 import RIO
-import qualified RIO.ByteString.Lazy as BL
 import System.Random
 import qualified Prelude as P
 
@@ -27,15 +32,6 @@ data R = R
 instance ToJSON R
 
 instance FromJSON R
-
-data R1 = R1
-  { r1Temperature :: Int
-  }
-  deriving (Generic, Show, Typeable)
-
-instance ToJSON R1
-
-instance FromJSON R1
 
 main :: IO ()
 main = do
@@ -53,12 +49,12 @@ main = do
           } ::
           Serde R
 
-  let r1Serde =
+  let intSerde =
         Serde
-          { serializer = Serializer encode,
-            deserializer = Deserializer $ fromJust . decode
+          { serializer = Serializer B.encode,
+            deserializer = Deserializer $ B.decode
           } ::
-          Serde R1
+          Serde Int
 
   let streamSourceConfig =
         HS.StreamSourceConfig
@@ -67,18 +63,29 @@ main = do
             sscValueSerde = rSerde
           }
 
+  let timeWindowSize = 3000
   let streamSinkConfig =
         HS.StreamSinkConfig
           { sicTopicName = "demo-sink",
-            sicKeySerde = textSerde,
-            sicValueSerde = r1Serde
+            sicKeySerde = timeWindowKeySerde textSerde timeWindowSize,
+            sicValueSerde = intSerde
           }
 
+  aggStore <- mkInMemoryKVStore
+  let materialized =
+        HS.Materialized
+          { mKeySerde = textSerde,
+            mValueSerde = intSerde,
+            mStateStore = aggStore
+          }
   streamBuilder <-
     HS.mkStreamBuilder "demo"
       >>= HS.stream streamSourceConfig
       >>= HS.filter filterR
-      >>= HS.map mapR
+      >>= HS.groupBy (fromJust . recordKey)
+      >>= HG.timeWindowedBy (mkHoppingWindow timeWindowSize 1000)
+      >>= HTW.count materialized
+      >>= HT.toStream
       >>= HS.to streamSinkConfig
 
   mockStore <- mkMockTopicStore
@@ -102,8 +109,13 @@ main = do
   _ <- async $
     forever $ do
       records <- pollRecords mc 1000000
-      forM_ records $ \RawConsumerRecord {..} ->
-        P.putStr "detect abnormal data: " >> BL.putStrLn rcrValue
+      forM_ records $ \RawConsumerRecord {..} -> do
+        let k = runDeser (timeWindowKeyDeserializer (deserializer textSerde) timeWindowSize) (fromJust rcrKey)
+        P.putStrLn $
+          ">>> count: key: "
+            ++ show k
+            ++ " , value: "
+            ++ show (B.decode rcrValue :: Int)
 
   logOptions <- logOptionsHandle stderr True
   withLogFunc logOptions $ \lf -> do
@@ -116,25 +128,16 @@ main = do
 
 filterR :: Record TL.Text R -> Bool
 filterR Record {..} =
-  temperature recordValue >= 50
+  temperature recordValue >= 0
     && humidity recordValue >= 0
-
-mapR :: Record TL.Text R -> Record TL.Text R1
-mapR r@Record {..} =
-  r
-    { recordValue =
-        R1
-          { r1Temperature = temperature recordValue
-          }
-    }
 
 mkMockData :: IO MockMessage
 mkMockData = do
-  k <- getStdRandom (randomR (1, 10)) :: IO Int
+  k <- getStdRandom (randomR (1, 2)) :: IO Int
   t <- getStdRandom (randomR (0, 100))
   h <- getStdRandom (randomR (0, 100))
   let r = R {temperature = t, humidity = h}
-  P.putStrLn $ "gen data: " ++ show r
+  P.putStrLn $ "gen data: " ++ " key: " ++ show k ++ ", value: " ++ show r
   ts <- getCurrentTimestamp
   return
     MockMessage

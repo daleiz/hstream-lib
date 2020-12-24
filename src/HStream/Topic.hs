@@ -12,6 +12,7 @@ module HStream.Topic
   )
 where
 
+import HStream.Type
 import RIO
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Text as T
@@ -19,8 +20,6 @@ import qualified RIO.Text as T
 type TopicName = T.Text
 
 type Offset = Word64
-
-type Timestamp = Word64
 
 class TopicConsumer a where
   subscribe :: a -> [TopicName] -> IO a
@@ -45,5 +44,6 @@ data RawConsumerRecord = RawConsumerRecord
 data RawProducerRecord = RawProducerRecord
   { rprTopic :: TopicName,
     rprKey :: Maybe BL.ByteString,
-    rprValue :: BL.ByteString
+    rprValue :: BL.ByteString,
+    rprTimestamp :: Timestamp
   }

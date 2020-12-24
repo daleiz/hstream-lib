@@ -28,14 +28,21 @@ library
                     , HStream.Stream
                     , HStream.Stream.Internal
                     , HStream.Stream.GroupedStream
+                    , HStream.Stream.TimeWindows
+                    , HStream.Stream.TimeWindowedStream
                     , HStream.Table
                     , HStream.Store
+                    , HStream.Type
+                    , HStream.Util
                       
   build-depends:      base
                     , rio
                     , comonad 
                     , data-default 
                     , template-haskell
+                    , bytestring
+                    , time
+                    , binary
   ghc-options:        -Wall
 
 executable processor-example0 
@@ -81,6 +88,20 @@ executable stream-example0
 executable stream-example1 
   default-language:   Haskell2010
   main-is:            StreamExample1.hs
+  hs-source-dirs:     example
+  build-depends:      base
+                    , rio
+                    , comonad 
+                    , aeson
+                    , random
+                    , text
+                    , hstream-lib
+                    , binary
+  ghc-options:        -Wall
+
+executable stream-example2 
+  default-language:   Haskell2010
+  main-is:            StreamExample2.hs
   hs-source-dirs:     example
   build-depends:      base
                     , rio

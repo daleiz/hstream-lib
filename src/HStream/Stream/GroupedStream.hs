@@ -7,6 +7,7 @@ module HStream.Stream.GroupedStream
   ( GroupedStream (..),
     aggregate,
     count,
+    timeWindowedBy,
   )
 where
 
@@ -15,6 +16,8 @@ import HStream.Encoding
 import HStream.Processor
 import HStream.Store
 import HStream.Stream.Internal
+import HStream.Stream.TimeWindowedStream (TimeWindowedStream (..))
+import HStream.Stream.TimeWindows
 import HStream.Table
 import RIO
 import qualified RIO.Text as T
@@ -74,3 +77,18 @@ aggregateProcessor storeName initialValue aggF keySerde accSerde = Processor $ \
   let sNewAcc = runSer (serializer accSerde) newAcc
   liftIO $ ksPut key sNewAcc store
   forward r {recordValue = newAcc}
+
+timeWindowedBy ::
+  (Typeable k, Typeable v) =>
+  TimeWindows ->
+  GroupedStream k v ->
+  IO (TimeWindowedStream k v)
+timeWindowedBy timeWindows GroupedStream {..} =
+  return $
+    TimeWindowedStream
+      { twsKeySerde = gsKeySerde,
+        twsValueSerde = gsValueSerde,
+        twsProcessorName = gsProcessorName,
+        twsTimeWindows = timeWindows,
+        twsInternalBuilder = gsInternalBuilder
+      }

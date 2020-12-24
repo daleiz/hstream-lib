@@ -15,6 +15,7 @@ import HStream.Encoding
 import HStream.Processor
 import HStream.Store
 import HStream.Topic
+import HStream.Util
 import RIO
 import qualified RIO.ByteString.Lazy as BL
 import System.Random
@@ -76,7 +77,8 @@ main = do
         RawProducerRecord
           { rprTopic = "demo-source",
             rprKey = mmKey,
-            rprValue = mmValue
+            rprValue = mmValue,
+            rprTimestamp = mmTimestamp
           }
 
   mc <- subscribe mc' ["demo-sink"]
@@ -116,9 +118,10 @@ mkMockData = do
   let r = R {temperature = t, humidity = h}
   let idk = TL.append "id-" $ TL.pack $ show k
   P.putStrLn $ "gen data: " ++ "key: " ++ TL.unpack idk ++ ", value: " ++ show r
+  ts <- getCurrentTimestamp
   return
     MockMessage
-      { mmTimestamp = 0,
+      { mmTimestamp = ts,
         mmKey = Just $ TLE.encodeUtf8 idk,
         mmValue = encode $ R {temperature = t, humidity = h}
       }

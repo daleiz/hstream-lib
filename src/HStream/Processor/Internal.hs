@@ -1,5 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
@@ -11,6 +12,7 @@ import Data.Default
 import Data.Typeable
 import HStream.Error (HStreamError (..))
 import HStream.Store
+import HStream.Type
 import RIO
 import qualified RIO.HashMap as HM
 import qualified RIO.HashSet as HS
@@ -27,11 +29,12 @@ mkEProcessor ::
 mkEProcessor proc = EProcessor $ \(ERecord record) ->
   case cast record of
     Just r -> runP proc r
-    Nothing -> throw $ TypeCastError "mkEProcessor: type cast error"
+    Nothing -> throw $ TypeCastError ("mkEProcessor: type cast error, real record type is: " `T.append` T.pack (show (typeOf record)))
 
 data Record k v = Record
   { recordKey :: Maybe k,
-    recordValue :: v
+    recordValue :: v,
+    recordTimestamp :: Timestamp
   }
 
 data ERecord = forall k v. (Typeable k, Typeable v) => ERecord (Record k v)
@@ -119,7 +122,8 @@ data Task = Task
 data TaskContext = TaskContext
   { taskConfig :: Task,
     tctLogFunc :: LogFunc,
-    curProcessor :: IORef T.Text
+    curProcessor :: IORef T.Text,
+    tcTimestamp :: IORef Int64
   }
 
 instance HasLogFunc TaskContext where
@@ -130,10 +134,20 @@ buildTaskContext ::
   LogFunc ->
   IO TaskContext
 buildTaskContext task lf = do
-  ref <- newIORef ""
+  pRef <- newIORef ""
+  tRef <- newIORef (-1)
   return $
     TaskContext
       { taskConfig = task,
         tctLogFunc = lf,
-        curProcessor = ref
+        curProcessor = pRef,
+        tcTimestamp = tRef
       }
+
+updateTimestampInTaskContext :: TaskContext -> Timestamp -> IO ()
+updateTimestampInTaskContext TaskContext {..} recordTimestamp = do
+  oldTs <- readIORef tcTimestamp
+  writeIORef tcTimestamp (max oldTs recordTimestamp)
+
+getTimestampInTaskContext :: TaskContext -> IO Timestamp
+getTimestampInTaskContext TaskContext {..} = readIORef tcTimestamp
