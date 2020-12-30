@@ -12,7 +12,8 @@ module HStream.Processor
     addStateStore,
     runTask,
     forward,
-    getStateStore,
+    getKVStateStore,
+    getSessionStateStore,
     mkMockTopicStore,
     mkMockTopicConsumer,
     mkMockTopicProducer,
@@ -244,9 +245,9 @@ addSink cfg@SinkConfig {..} parentNames builder =
       }
 
 addStateStore ::
-  (Typeable k, Typeable v, Ord k, KVStore s) =>
+  (Typeable k, Typeable v, Ord k) =>
   T.Text ->
-  s k v ->
+  StateStore k v ->
   [T.Text] ->
   TaskBuilder ->
   Task
@@ -256,7 +257,7 @@ addStateStore storeName store processors builder =
       { stores =
           HM.singleton
             storeName
-            (mkDEKVStore store, HS.fromList processors)
+            (wrapStateStore store, HS.fromList processors)
       }
 
 runTask ::
@@ -342,19 +343,35 @@ forward record = do
     let (eProcessor, _) = tplgy HM'.! cname
     runEP eProcessor (mkERecord record)
 
-getStateStore ::
+getKVStateStore ::
   (Typeable k, Typeable v, Ord k) =>
   T.Text ->
   RIO TaskContext (EKVStore k v)
-getStateStore storeName = do
+getKVStateStore storeName = do
   ctx <- ask
   curProcessorName <- readIORef $ curProcessor ctx
   logDebug $ display curProcessorName <> " ready to get state store " <> display storeName
   let taskInfo = taskConfig ctx
   case HM.lookup storeName (taskStores taskInfo) of
-    Just (deStore, processors) ->
+    Just (stateStore, processors) ->
       if HS.member curProcessorName processors
-        then return $ fromDEKVStore deStore
+        then return $ fromEStateStoreToKVStore stateStore 
+        else error "no state store found"
+    Nothing -> error "no state store found"
+
+getSessionStateStore ::
+  (Typeable k, Typeable v, Ord k) =>
+  T.Text ->
+  RIO TaskContext (ESessionStore k v)
+getSessionStateStore storeName = do
+  ctx <- ask
+  curProcessorName <- readIORef $ curProcessor ctx
+  logDebug $ display curProcessorName <> " ready to get state store " <> display storeName
+  let taskInfo = taskConfig ctx
+  case HM.lookup storeName (taskStores taskInfo) of
+    Just (stateStore, processors) ->
+      if HS.member curProcessorName processors
+        then return $ fromEStateStoreToSessionStore stateStore 
         else error "no state store found"
     Nothing -> error "no state store found"
 

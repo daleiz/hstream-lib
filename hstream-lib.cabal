@@ -30,6 +30,8 @@ library
                     , HStream.Stream.GroupedStream
                     , HStream.Stream.TimeWindows
                     , HStream.Stream.TimeWindowedStream
+                    , HStream.Stream.SessionWindows
+                    , HStream.Stream.SessionWindowedStream
                     , HStream.Table
                     , HStream.Store
                     , HStream.Type
@@ -102,6 +104,20 @@ executable stream-example1
 executable stream-example2 
   default-language:   Haskell2010
   main-is:            StreamExample2.hs
+  hs-source-dirs:     example
+  build-depends:      base
+                    , rio
+                    , comonad 
+                    , aeson
+                    , random
+                    , text
+                    , hstream-lib
+                    , binary
+  ghc-options:        -Wall
+
+executable stream-example3 
+  default-language:   Haskell2010
+  main-is:            StreamExample3.hs
   hs-source-dirs:     example
   build-depends:      base
                     , rio

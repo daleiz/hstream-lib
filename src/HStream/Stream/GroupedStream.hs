@@ -8,6 +8,7 @@ module HStream.Stream.GroupedStream
     aggregate,
     count,
     timeWindowedBy,
+    sessionWindowedBy,
   )
 where
 
@@ -16,6 +17,8 @@ import HStream.Encoding
 import HStream.Processor
 import HStream.Store
 import HStream.Stream.Internal
+import HStream.Stream.SessionWindowedStream (SessionWindowedStream (..))
+import HStream.Stream.SessionWindows
 import HStream.Stream.TimeWindowedStream (TimeWindowedStream (..))
 import HStream.Stream.TimeWindows
 import HStream.Table
@@ -30,10 +33,10 @@ data GroupedStream k v = GroupedStream
   }
 
 aggregate ::
-  (Typeable k, Typeable v, Ord k, Typeable a, KVStore s) =>
+  (Typeable k, Typeable v, Ord k, Typeable a) =>
   a ->
   (a -> Record k v -> a) ->
-  Materialized k a s ->
+  Materialized k a ->
   GroupedStream k v ->
   IO (Table k a)
 aggregate initialValue aggF Materialized {..} GroupedStream {..} = do
@@ -51,8 +54,8 @@ aggregate initialValue aggF Materialized {..} GroupedStream {..} = do
       }
 
 count ::
-  (Typeable k, Typeable v, Ord k, KVStore s) =>
-  Materialized k Int s ->
+  (Typeable k, Typeable v, Ord k) =>
+  Materialized k Int ->
   GroupedStream k v ->
   IO (Table k Int)
 count materialized groupedStream = aggregate 0 aggF materialized groupedStream
@@ -69,7 +72,7 @@ aggregateProcessor ::
   Serde a ->
   Processor k v
 aggregateProcessor storeName initialValue aggF keySerde accSerde = Processor $ \r -> do
-  store <- getStateStore storeName
+  store <- getKVStateStore storeName
   let key = runSer (serializer keySerde) (fromJust $ recordKey r)
   ma <- liftIO $ ksGet key store
   let acc = maybe initialValue (runDeser $ deserializer accSerde) ma
@@ -91,4 +94,19 @@ timeWindowedBy timeWindows GroupedStream {..} =
         twsProcessorName = gsProcessorName,
         twsTimeWindows = timeWindows,
         twsInternalBuilder = gsInternalBuilder
+      }
+
+sessionWindowedBy ::
+  (Typeable k, Typeable v) =>
+  SessionWindows ->
+  GroupedStream k v ->
+  IO (SessionWindowedStream k v)
+sessionWindowedBy sessionWindows GroupedStream {..} =
+  return $
+    SessionWindowedStream
+      { swsKeySerde = gsKeySerde,
+        swsValueSerde = gsValueSerde,
+        swsProcessorName = gsProcessorName,
+        swsSessionWindows = sessionWindows,
+        swsInternalBuilder = gsInternalBuilder
       }

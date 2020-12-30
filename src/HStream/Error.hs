@@ -13,6 +13,7 @@ data HStreamError
   | UnSupportedMessageStoreError Text
   | UnSupportedStateStoreError Text
   | TypeCastError Text
+  | UnExpectedStateStoreType Text
   | UnknownError Text
   deriving (Show)
 

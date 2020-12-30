@@ -48,7 +48,7 @@ main = do
             valueSerializer = Serializer (B.encode :: Int -> BL.ByteString)
           }
 
-  memoryStore <- mkInMemoryKVStore :: IO (InMemoryKVStore TL.Text Int)
+  memoryStore <- mkInMemoryStateKVStore :: IO (StateStore TL.Text Int)
   let task =
         build $
           buildTask "demo"
@@ -137,7 +137,7 @@ aggProcessor ::
   (a -> Record k v -> a) ->
   Processor k v
 aggProcessor storeName initialValue aggF = Processor $ \r -> do
-  store <- getStateStore storeName
+  store <- getKVStateStore storeName
   let key = fromJust $ recordKey r
   ma <- liftIO $ ksGet key store
   let acc = fromMaybe initialValue ma

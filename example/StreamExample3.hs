@@ -14,14 +14,14 @@ import HStream.Processor
 import HStream.Store
 import qualified HStream.Stream as HS
 import qualified HStream.Stream.GroupedStream as HG
-import qualified HStream.Stream.TimeWindowedStream as HTW
-import HStream.Stream.TimeWindows
+import HStream.Stream.SessionWindows
 import qualified HStream.Table as HT
 import HStream.Topic
 import HStream.Util
 import RIO
 import System.Random
 import qualified Prelude as P
+import HStream.Stream.SessionWindowedStream as HSW
 
 data R = R
   { temperature :: Int,
@@ -63,15 +63,14 @@ main = do
             sscValueSerde = rSerde
           }
 
-  let timeWindowSize = 3000
   let streamSinkConfig =
         HS.StreamSinkConfig
           { sicTopicName = "demo-sink",
-            sicKeySerde = timeWindowKeySerde textSerde timeWindowSize,
+            sicKeySerde = sessionWindowKeySerde textSerde,
             sicValueSerde = intSerde
           }
 
-  aggStore <- mkInMemoryStateKVStore
+  aggStore <- mkInMemoryStateSessionStore
   let materialized =
         HS.Materialized
           { mKeySerde = textSerde,
@@ -83,8 +82,8 @@ main = do
       >>= HS.stream streamSourceConfig
       >>= HS.filter filterR
       >>= HS.groupBy (fromJust . recordKey)
-      >>= HG.timeWindowedBy (mkHoppingWindow timeWindowSize 1000)
-      >>= HTW.count materialized
+      >>= HG.sessionWindowedBy (mkSessionWindows 10000)
+      >>= HSW.count materialized
       >>= HT.toStream
       >>= HS.to streamSinkConfig
 
@@ -110,7 +109,7 @@ main = do
     forever $ do
       records <- pollRecords mc 1000000
       forM_ records $ \RawConsumerRecord {..} -> do
-        let k = runDeser (timeWindowKeyDeserializer (deserializer textSerde) timeWindowSize) (fromJust rcrKey)
+        let k = runDeser (sessionWindowKeyDeserializer (deserializer textSerde)) (fromJust rcrKey)
         P.putStrLn $
           ">>> count: key: "
             ++ show k
@@ -133,7 +132,7 @@ filterR Record {..} =
 
 mkMockData :: IO MockMessage
 mkMockData = do
-  k <- getStdRandom (randomR (1, 2)) :: IO Int
+  k <- getStdRandom (randomR (1, 1)) :: IO Int
   t <- getStdRandom (randomR (0, 100))
   h <- getStdRandom (randomR (0, 100))
   let r = R {temperature = t, humidity = h}

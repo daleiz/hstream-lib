@@ -98,9 +98,9 @@ addSinkInternal sinkCfg parents builder@InternalStreamBuilder {..} = do
     builder {isbTaskBuilder = taskBuilder}
 
 addStateStoreInternal ::
-  (Typeable k, Typeable v, Ord k, KVStore s) =>
+  (Typeable k, Typeable v, Ord k) =>
   T.Text ->
-  s k v ->
+  StateStore k v ->
   [T.Text] ->
   InternalStreamBuilder ->
   IO InternalStreamBuilder
@@ -122,8 +122,9 @@ mkInternalStoreName :: T.Text -> T.Text
 mkInternalStoreName namePrefix =
   namePrefix `T.append` "-STORE"
 
-data Materialized k v s = Materialized
+data Materialized k v = Materialized
   { mKeySerde :: Serde k,
     mValueSerde :: Serde v,
-    mStateStore :: s BL.ByteString BL.ByteString
+    mStateStore :: StateStore BL.ByteString BL.ByteString
+    -- mStateStore :: StateStore k v 
   }

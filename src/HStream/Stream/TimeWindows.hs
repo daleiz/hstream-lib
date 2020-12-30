@@ -28,6 +28,11 @@ data TimeWindows = TimeWindows
     twGraceMs :: Int64
   }
 
+data SessionWindows = SessionWindows
+  { swInactivityGap :: Int64,
+    swGraceMs :: Int64
+  }
+
 mkTumblingWindow :: Int64 -> TimeWindows
 mkTumblingWindow windowSize =
   TimeWindows

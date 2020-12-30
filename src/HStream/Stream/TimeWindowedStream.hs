@@ -30,10 +30,10 @@ data TimeWindowedStream k v = TimeWindowedStream
   }
 
 aggregate ::
-  (Typeable k, Typeable v, Ord k, Typeable a, KVStore s) =>
+  (Typeable k, Typeable v, Ord k, Typeable a) =>
   a ->
   (a -> Record k v -> a) ->
-  Materialized k a s ->
+  Materialized k a ->
   TimeWindowedStream k v ->
   IO (Table (TimeWindowKey k) a)
 aggregate initialValue aggF Materialized {..} TimeWindowedStream {..} = do
@@ -51,8 +51,8 @@ aggregate initialValue aggF Materialized {..} TimeWindowedStream {..} = do
       }
 
 count ::
-  (Typeable k, Typeable v, Ord k, KVStore s) =>
-  Materialized k Int s ->
+  (Typeable k, Typeable v, Ord k) =>
+  Materialized k Int ->
   TimeWindowedStream k v ->
   IO (Table (TimeWindowKey k) Int)
 count = aggregate 0 aggF
@@ -71,7 +71,7 @@ aggregateProcessor ::
   Processor k v
 aggregateProcessor storeName initialValue aggF keySerde accSerde windows@TimeWindows {..} = Processor $ \r@Record {..} -> do
   ctx <- ask
-  store <- getStateStore storeName
+  store <- getKVStateStore storeName
   logDebug $ "recordTimestamp: " <> displayShow recordTimestamp
   let matchedWindows = windowsFor recordTimestamp windows
   logDebug $ "matchedWindows: " <> displayShow matchedWindows

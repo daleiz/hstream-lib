@@ -46,7 +46,7 @@ data TaskTopologyConfig = TaskTopologyConfig
   { sourceCfgs :: HM.HashMap T.Text InternalSourceConfig,
     topology :: HM.HashMap T.Text (EProcessor, [T.Text]),
     sinkCfgs :: HM.HashMap T.Text InternalSinkConfig,
-    stores :: HM.HashMap T.Text (DEKVStore, HS.HashSet T.Text)
+    stores :: HM.HashMap T.Text (EStateStore, HS.HashSet T.Text)
   }
 
 instance Default TaskTopologyConfig where
@@ -116,7 +116,7 @@ data Task = Task
     taskTopologyReversed :: HM.HashMap T.Text (EProcessor, [T.Text]),
     taskTopologyForward :: HM.HashMap T.Text (EProcessor, [T.Text]),
     taskSinkConfig :: HM.HashMap T.Text InternalSinkConfig,
-    taskStores :: HM.HashMap T.Text (DEKVStore, HS.HashSet T.Text)
+    taskStores :: HM.HashMap T.Text (EStateStore, HS.HashSet T.Text)
   }
 
 data TaskContext = TaskContext

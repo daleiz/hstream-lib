@@ -68,7 +68,7 @@ main = do
             sicValueSerde = intSerde
           }
 
-  aggStore <- mkInMemoryKVStore
+  aggStore <- mkInMemoryStateKVStore
   let materialized =
         HS.Materialized
           { mKeySerde = textSerde,
