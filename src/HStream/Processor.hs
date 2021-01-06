@@ -14,6 +14,7 @@ module HStream.Processor
     forward,
     getKVStateStore,
     getSessionStateStore,
+    getTimestampedKVStateStore,
     mkMockTopicStore,
     mkMockTopicConsumer,
     mkMockTopicProducer,
@@ -28,7 +29,6 @@ module HStream.Processor
   )
 where
 
-import Control.Comonad.Traced
 import Control.Exception (throw)
 import Data.Maybe
 import Data.Typeable
@@ -49,47 +49,48 @@ import qualified RIO.Text as T
 -- import qualified Prelude as P
 
 build :: TaskBuilder -> Task
-build = extract
+build tp@TaskTopologyConfig {..} =
+  let _ = validateTopology tp
+      topologyForward =
+        HM.foldlWithKey'
+          ( \acc k v ->
+              let childName = k
+                  (curP, parentsName) = v
+                  nacc =
+                    if HM.member childName acc
+                      then acc
+                      else HM.insert childName (curP, []) acc
+               in foldl'
+                    ( \acc' parent ->
+                        if HM.member parent acc'
+                          then
+                            let (p, cs) = acc' HM'.! parent
+                             in HM.insert parent (p, cs ++ [childName]) acc'
+                          else
+                            let (p, _) = topology HM'.! parent
+                             in HM.insert parent (p, [childName]) acc'
+                    )
+                    nacc
+                    parentsName
+          )
+          (HM.empty :: HM.HashMap T.Text (EProcessor, [T.Text]))
+          topology
+   in Task
+        { taskName = ttcName,
+          taskSourceConfig = sourceCfgs,
+          taskSinkConfig = sinkCfgs,
+          taskTopologyReversed = topology,
+          taskTopologyForward = topologyForward,
+          taskStores = stores
+        }
 
 buildTask ::
   T.Text ->
   TaskBuilder
-buildTask = traced . buildTask'
-  where
-    buildTask' taskName tp@TaskTopologyConfig {..} =
-      let _ = validateTopology tp
-          topologyForward =
-            HM.foldlWithKey'
-              ( \acc k v ->
-                  let childName = k
-                      (curP, parentsName) = v
-                      nacc =
-                        if HM.member childName acc
-                          then acc
-                          else HM.insert childName (curP, []) acc
-                   in foldl'
-                        ( \acc' parent ->
-                            if HM.member parent acc'
-                              then
-                                let (p, cs) = acc' HM'.! parent
-                                 in HM.insert parent (p, cs ++ [childName]) acc'
-                              else
-                                let (p, _) = topology HM'.! parent
-                                 in HM.insert parent (p, [childName]) acc'
-                        )
-                        nacc
-                        parentsName
-              )
-              (HM.empty :: HM.HashMap T.Text (EProcessor, [T.Text]))
-              topology
-       in Task
-            { taskName = taskName,
-              taskSourceConfig = sourceCfgs,
-              taskSinkConfig = sinkCfgs,
-              taskTopologyReversed = topology,
-              taskTopologyForward = topologyForward,
-              taskStores = stores
-            }
+buildTask taskName =
+  mempty
+    { ttcName = taskName
+    }
 
 validateTopology :: TaskTopologyConfig -> ()
 validateTopology TaskTopologyConfig {..} =
@@ -117,23 +118,21 @@ data SinkConfig k v = SinkConfig
 addSource ::
   (Typeable k, Typeable v) =>
   SourceConfig k v ->
-  TaskBuilder ->
-  Task
-addSource cfg@SourceConfig {..} builder =
-  runTraced builder $
-    mempty
-      { sourceCfgs =
-          HM.singleton
-            sourceTopicName
-            InternalSourceConfig
-              { iSourceName = sourceName,
-                iSourceTopicName = sourceTopicName
-              },
-        topology =
-          HM.singleton
-            sourceName
-            (mkEProcessor $ buildSourceProcessor cfg, [])
-      }
+  TaskBuilder
+addSource cfg@SourceConfig {..} =
+  mempty
+    { sourceCfgs =
+        HM.singleton
+          sourceTopicName
+          InternalSourceConfig
+            { iSourceName = sourceName,
+              iSourceTopicName = sourceTopicName
+            },
+      topology =
+        HM.singleton
+          sourceName
+          (mkEProcessor $ buildSourceProcessor cfg, [])
+    }
 
 buildSourceProcessor ::
   (Typeable k, Typeable v) =>
@@ -158,13 +157,11 @@ addProcessor ::
   T.Text ->
   Processor kin vin ->
   [T.Text] ->
-  TaskBuilder ->
-  Task
-addProcessor name processor parentNames builder =
-  runTraced builder $
-    mempty
-      { topology = HM.singleton name (mkEProcessor processor, parentNames)
-      }
+  TaskBuilder
+addProcessor name processor parentNames =
+  mempty
+    { topology = HM.singleton name (mkEProcessor processor, parentNames)
+    }
 
 buildSinkProcessor ::
   (Typeable k, Typeable v) =>
@@ -226,39 +223,35 @@ addSink ::
   (Typeable k, Typeable v) =>
   SinkConfig k v ->
   [T.Text] ->
-  TaskBuilder ->
-  Task
-addSink cfg@SinkConfig {..} parentNames builder =
-  runTraced builder $
-    mempty
-      { topology =
-          HM.singleton
-            sinkName
-            (mkEProcessor $ buildSinkProcessor cfg, parentNames),
-        sinkCfgs =
-          HM.singleton
-            sinkName
-            InternalSinkConfig
-              { iSinkName = sinkName,
-                iSinkTopicName = sinkTopicName
-              }
-      }
+  TaskBuilder
+addSink cfg@SinkConfig {..} parentNames =
+  mempty
+    { topology =
+        HM.singleton
+          sinkName
+          (mkEProcessor $ buildSinkProcessor cfg, parentNames),
+      sinkCfgs =
+        HM.singleton
+          sinkName
+          InternalSinkConfig
+            { iSinkName = sinkName,
+              iSinkTopicName = sinkTopicName
+            }
+    }
 
 addStateStore ::
   (Typeable k, Typeable v, Ord k) =>
   T.Text ->
   StateStore k v ->
   [T.Text] ->
-  TaskBuilder ->
-  Task
-addStateStore storeName store processors builder =
-  runTraced builder $
-    mempty
-      { stores =
-          HM.singleton
-            storeName
-            (wrapStateStore store, HS.fromList processors)
-      }
+  TaskBuilder
+addStateStore storeName store processors =
+  mempty
+    { stores =
+        HM.singleton
+          storeName
+          (wrapStateStore store, HS.fromList processors)
+    }
 
 runTask ::
   TaskConfig ->
@@ -355,7 +348,7 @@ getKVStateStore storeName = do
   case HM.lookup storeName (taskStores taskInfo) of
     Just (stateStore, processors) ->
       if HS.member curProcessorName processors
-        then return $ fromEStateStoreToKVStore stateStore 
+        then return $ fromEStateStoreToKVStore stateStore
         else error "no state store found"
     Nothing -> error "no state store found"
 
@@ -371,7 +364,23 @@ getSessionStateStore storeName = do
   case HM.lookup storeName (taskStores taskInfo) of
     Just (stateStore, processors) ->
       if HS.member curProcessorName processors
-        then return $ fromEStateStoreToSessionStore stateStore 
+        then return $ fromEStateStoreToSessionStore stateStore
+        else error "no state store found"
+    Nothing -> error "no state store found"
+
+getTimestampedKVStateStore ::
+  (Typeable k, Typeable v, Ord k) =>
+  T.Text ->
+  RIO TaskContext (ETimestampedKVStore k v)
+getTimestampedKVStateStore storeName = do
+  ctx <- ask
+  curProcessorName <- readIORef $ curProcessor ctx
+  logDebug $ display curProcessorName <> " ready to get state store " <> display storeName
+  let taskInfo = taskConfig ctx
+  case HM.lookup storeName (taskStores taskInfo) of
+    Just (stateStore, processors) ->
+      if HS.member curProcessorName processors
+        then return $ fromEStateStoreToTimestampedKVStore stateStore
         else error "no state store found"
     Nothing -> error "no state store found"
 

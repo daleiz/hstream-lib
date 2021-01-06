@@ -4,7 +4,6 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-import Control.Comonad ((=>>))
 import Data.Aeson
 import qualified Data.Binary as B
 import Data.Maybe
@@ -52,17 +51,17 @@ main = do
   let task =
         build $
           buildTask "demo"
-            =>> addSource sourceConfig
-            =>> addProcessor
+            <> addSource sourceConfig
+            <> addProcessor
               "filter"
               (filterProcessor filterR)
               ["source"]
-            =>> addProcessor
+            <> addProcessor
               "count"
               (aggProcessor "demo-store" 0 countR)
               ["filter"]
-            =>> addSink sinkConfig ["count"]
-            =>> addStateStore "demo-store" memoryStore ["count"]
+            <> addSink sinkConfig ["count"]
+            <> addStateStore "demo-store" memoryStore ["count"]
 
   mockStore <- mkMockTopicStore
   mp <- mkMockTopicProducer mockStore

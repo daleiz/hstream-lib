@@ -4,7 +4,6 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-import Control.Comonad ((=>>))
 import Data.Aeson
 import Data.Maybe
 import qualified Data.Text.Lazy as TL
@@ -47,12 +46,12 @@ main = do
   let task =
         build $
           buildTask "demo"
-            =>> addSource sourceConfig
-            =>> addProcessor
+            <> addSource sourceConfig
+            <> addProcessor
               "filter"
               (filterProcessor filterR)
               ["source"]
-            =>> addSink sinkConfig ["filter"]
+            <> addSink sinkConfig ["filter"]
 
   mockStore <- mkMockTopicStore
   mp <- mkMockTopicProducer mockStore

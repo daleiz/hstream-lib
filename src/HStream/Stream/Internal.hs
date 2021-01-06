@@ -4,7 +4,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module HStream.Stream.Internal
-  ( InternalStreamBuilder,
+  ( InternalStreamBuilder (..),
     Stream (..),
     Materialized (..),
     mkStream,
@@ -16,10 +16,10 @@ module HStream.Stream.Internal
     addSinkInternal,
     addStateStoreInternal,
     buildInternal,
+    mergeInternalStreamBuilder,
   )
 where
 
-import Control.Comonad ((=>>))
 import HStream.Encoding
 import HStream.Processor
 import HStream.Processor.Internal
@@ -64,15 +64,21 @@ mkInternalStreamBuilder taskBuilder = do
         isbProcessorId = index
       }
 
+mergeInternalStreamBuilder :: InternalStreamBuilder -> InternalStreamBuilder -> InternalStreamBuilder
+mergeInternalStreamBuilder builder1 builder2 =
+  InternalStreamBuilder
+    { isbTaskBuilder = (isbTaskBuilder builder1) <> (isbTaskBuilder builder2),
+      isbProcessorId = isbProcessorId builder1
+    }
+
 addSourceInternal ::
   (Typeable k, Typeable v) =>
   SourceConfig k v ->
   InternalStreamBuilder ->
-  IO InternalStreamBuilder
-addSourceInternal sourceCfg builder@InternalStreamBuilder {..} = do
-  let taskBuilder = isbTaskBuilder =>> addSource sourceCfg
-  return
-    builder {isbTaskBuilder = taskBuilder}
+  InternalStreamBuilder
+addSourceInternal sourceCfg builder@InternalStreamBuilder {..} =
+  let taskBuilder = isbTaskBuilder <> addSource sourceCfg
+   in builder {isbTaskBuilder = taskBuilder}
 
 addProcessorInternal ::
   (Typeable k, Typeable v) =>
@@ -80,22 +86,20 @@ addProcessorInternal ::
   Processor k v ->
   [T.Text] ->
   InternalStreamBuilder ->
-  IO InternalStreamBuilder
-addProcessorInternal processorName processor parents builder@InternalStreamBuilder {..} = do
-  let taskBuilder = isbTaskBuilder =>> addProcessor processorName processor parents
-  return
-    builder {isbTaskBuilder = taskBuilder}
+  InternalStreamBuilder
+addProcessorInternal processorName processor parents builder@InternalStreamBuilder {..} =
+  let taskBuilder = isbTaskBuilder <> addProcessor processorName processor parents
+   in builder {isbTaskBuilder = taskBuilder}
 
 addSinkInternal ::
   (Typeable k, Typeable v) =>
   SinkConfig k v ->
   [T.Text] ->
   InternalStreamBuilder ->
-  IO InternalStreamBuilder
-addSinkInternal sinkCfg parents builder@InternalStreamBuilder {..} = do
-  let taskBuilder = isbTaskBuilder =>> addSink sinkCfg parents
-  return
-    builder {isbTaskBuilder = taskBuilder}
+  InternalStreamBuilder
+addSinkInternal sinkCfg parents builder@InternalStreamBuilder {..} =
+  let taskBuilder = isbTaskBuilder <> addSink sinkCfg parents
+   in builder {isbTaskBuilder = taskBuilder}
 
 addStateStoreInternal ::
   (Typeable k, Typeable v, Ord k) =>
@@ -103,11 +107,10 @@ addStateStoreInternal ::
   StateStore k v ->
   [T.Text] ->
   InternalStreamBuilder ->
-  IO InternalStreamBuilder
-addStateStoreInternal storeName store processors builder@InternalStreamBuilder {..} = do
-  let taskBuilder = isbTaskBuilder =>> addStateStore storeName store processors
-  return
-    builder {isbTaskBuilder = taskBuilder}
+  InternalStreamBuilder
+addStateStoreInternal storeName store processors builder@InternalStreamBuilder {..} =
+  let taskBuilder = isbTaskBuilder <> addStateStore storeName store processors
+   in builder {isbTaskBuilder = taskBuilder}
 
 buildInternal :: InternalStreamBuilder -> Task
 buildInternal InternalStreamBuilder {..} = build isbTaskBuilder
@@ -126,5 +129,5 @@ data Materialized k v = Materialized
   { mKeySerde :: Serde k,
     mValueSerde :: Serde v,
     mStateStore :: StateStore BL.ByteString BL.ByteString
-    -- mStateStore :: StateStore k v 
+    -- mStateStore :: StateStore k v
   }

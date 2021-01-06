@@ -43,8 +43,8 @@ aggregate initialValue aggF Materialized {..} GroupedStream {..} = do
   processorName <- mkInternalProcessorName "STREAM-AGGREGATE-" gsInternalBuilder
   let storeName = mkInternalStoreName processorName
   let p = aggregateProcessor storeName initialValue aggF mKeySerde mValueSerde
-  builder' <- addProcessorInternal processorName p [gsProcessorName] gsInternalBuilder
-  newBuilder <- addStateStoreInternal storeName mStateStore [processorName] builder'
+  let builder' = addProcessorInternal processorName p [gsProcessorName] gsInternalBuilder
+  let newBuilder = addStateStoreInternal storeName mStateStore [processorName] builder'
   return
     Table
       { tableInternalBuilder = newBuilder,

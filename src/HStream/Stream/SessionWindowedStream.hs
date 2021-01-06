@@ -42,8 +42,8 @@ aggregate initialValue aggF sessionMergeF Materialized {..} SessionWindowedStrea
   processorName <- mkInternalProcessorName "SESSION-WINDOWED-STREAM-AGGREGATE-" swsInternalBuilder
   let storeName = mkInternalStoreName processorName
   let p = aggregateProcessor storeName initialValue aggF sessionMergeF mKeySerde mValueSerde swsSessionWindows
-  builder' <- addProcessorInternal processorName p [swsProcessorName] swsInternalBuilder
-  newBuilder <- addStateStoreInternal storeName mStateStore [processorName] builder'
+  let builder' = addProcessorInternal processorName p [swsProcessorName] swsInternalBuilder
+  let newBuilder = addStateStoreInternal storeName mStateStore [processorName] builder'
   return
     Table
       { tableInternalBuilder = newBuilder,

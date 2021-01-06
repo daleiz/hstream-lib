@@ -7,6 +7,7 @@
 module HStream.Store
   ( KVStore (..),
     SessionStore (..),
+    TimestampedKVStore (..),
     StateStore,
     InMemoryKVStore,
     -- mkInMemoryKVStore,
@@ -22,6 +23,9 @@ module HStream.Store
     wrapStateStore,
     EStateStore,
     ESessionStore,
+    mkInMemoryStateTimestampedKVStore,
+    ETimestampedKVStore,
+    fromEStateStoreToTimestampedKVStore,
   )
 where
 
@@ -51,6 +55,7 @@ mkInMemoryKVStore = do
 class KVStore s where
   ksGet :: Ord k => k -> s k v -> IO (Maybe v)
   ksPut :: Ord k => k -> v -> s k v -> IO ()
+  ksRange :: Ord k => k -> k -> s k v -> IO [(k, v)]
 
 instance KVStore InMemoryKVStore where
   ksGet k InMemoryKVStore {..} = do
@@ -60,6 +65,17 @@ instance KVStore InMemoryKVStore where
   ksPut k v InMemoryKVStore {..} = do
     dict <- readIORef imksData
     writeIORef imksData (Map.insert k v dict)
+
+  ksRange fromKey toKey InMemoryKVStore {..} = do
+    dict <- readIORef imksData
+    let (_, ms, lm) = Map.splitLookup fromKey dict
+    let (sm, ml, _) = Map.splitLookup toKey lm
+    let r1 = do
+          r0 <- fmap (\v -> Map.insert fromKey v sm) ms
+          fmap (\v -> Map.insert toKey v r0) ml
+    case r1 of
+      Just rm -> return $ Map.toAscList rm
+      Nothing -> return $ Map.toAscList sm
 
 data EKVStore k v
   = forall s.
@@ -75,6 +91,8 @@ instance KVStore EKVStore where
   ksGet k (EKVStore s) = ksGet k s
 
   ksPut k v (EKVStore s) = ksPut k v s
+
+  ksRange fromKey toKey (EKVStore s) = ksRange fromKey toKey s
 
 mkDEKVStore ::
   (KVStore s, Typeable k, Typeable v, Ord k) =>
@@ -94,10 +112,12 @@ fromDEKVStoreToEKVStore (DEKVStore eStore) =
 data StateStore k v
   = KVStateStore (EKVStore k v)
   | SessionStateStore (ESessionStore k v)
+  | TimestampedKVStateStore (ETimestampedKVStore k v)
 
 data EStateStore
   = EKVStateStore DEKVStore
   | ESessionStateStore DESessionStore
+  | ETimestampedKVStateStore DETimestampedKVStore
 
 wrapStateStore ::
   (Typeable k, Typeable v) =>
@@ -107,6 +127,7 @@ wrapStateStore stateStore =
   case stateStore of
     KVStateStore kvStore -> EKVStateStore (DEKVStore kvStore)
     SessionStateStore sessionStore -> ESessionStateStore (DESessionStore sessionStore)
+    TimestampedKVStateStore timestampedKVStore -> ETimestampedKVStateStore (DETimestampedKVStore timestampedKVStore)
 
 class SessionStore s where
   ssGet :: (Typeable k, Ord k) => SessionWindowKey k -> s k v -> IO (Maybe v)
@@ -246,6 +267,11 @@ mkInMemoryStateSessionStore = do
   store <- mkInMemorySessionStore
   return $ SessionStateStore $ ESessionStore store
 
+mkInMemoryStateTimestampedKVStore :: IO (StateStore k v)
+mkInMemoryStateTimestampedKVStore = do
+  store <- mkInMemoryTimestampedKVStore
+  return $ TimestampedKVStateStore $ ETimestampedKVStore store
+
 fromEStateStoreToKVStore ::
   (Typeable k, Typeable v, Ord k) =>
   EStateStore ->
@@ -264,65 +290,103 @@ fromEStateStoreToSessionStore eStore =
     ESessionStateStore s -> fromDESessionStoreToESessionStore s
     _ -> throw $ UnExpectedStateStoreType "expect SessionStateStore"
 
---
--- 用 ADT 就会造成匹配要修改？
--- 还好吧，
--- 只要各取所需应该就可以.
---
---
--- Store 之间是否要有类似继承的关系？
--- SessionStore 其实就是一种特殊的 KVStore,
--- 如果用继承来建模的话，
--- addStateStore 那里如果用了 KVStore 做签名，
--- 然而实际传进去的是一个 SessionStore,
--- 我还能用 findSessions 方法吗？
--- 理论上不能，
--- 但是 oop 里面可以进行 cast，将父类型强转成子类型.
--- 如果不能用强制 cast, 继承就没啥好处.
---
--- 那如果将这两个接口分开，相互独立，
--- 又有哪些问题呢？
--- 就是写 addStateStore 的时候签名给什么呢？
--- 可能需要构造一个 ADT 了，
---
--- 这种问题又是来源于那种想用一个概念抽象一组东西，
--- 然后用这个抽象的概念作为统一的接口，
--- 然而实现上却要依赖各自实现的不同接口.
--- 这里你要用到的是特化的部分，
--- 而不是一致的部分.
--- 所以这种抽象在这种情况下感觉不是很好。
---
--- ADT 呢就相当于把这些特殊情况事先都列举出来了，
--- 缺点就是代码修改起来会很麻烦。
--- ADT 里加一项，
--- 所有匹配的地方就都要跟着加.
---
--- 如果现在换成 ADT 的话，
--- 之前用 KVStore 的地方，
--- 在使用前都要先做一下模式匹配，
--- 但模式匹配用在这里也不用很合适，
--- 模式匹配更适合于那种多种情况都有可能发生，
--- 每个模式代表一种可能的情况，
--- 然后代码要能处理这些所有的情况.
---
--- 现在这种情况其实是要求特事特办，
--- 我要用 KVStore 的地方，
--- 不希望你传给我 SessionStore,
--- 反之我要 SessionStore 的地方，
--- 你也不要只给我 KVStore.
---
--- 但是不管怎样呢，
--- 我还是需要用一个变量表示这两种不同的 Store,
--- 就像 Java  需要向下 cast 一样，
--- 这是跑不掉的.
---
--- 这就是就是 Expression Problem.
---
--- 比如一开始有个 data Shape
--- 覆盖了正方形和圆形两种 shape,
--- 有对 shape 求面积的方法.
---
--- 现在要加一个三角形和一个求周长的方法进来，
--- 应该如何在不影响之前代码的情况下实现呢？
---
--- 还有没有别的方法进行建模呢?
+fromEStateStoreToTimestampedKVStore ::
+  (Typeable k, Typeable v, Ord k) =>
+  EStateStore ->
+  ETimestampedKVStore k v
+fromEStateStoreToTimestampedKVStore eStore =
+  case eStore of
+    ETimestampedKVStateStore s -> fromDETimestampedKVStoreToETimestampedKVStore s
+    _ -> throw $ UnExpectedStateStoreType "expect TimestampdKVStateStore"
+
+class TimestampedKVStore s where
+  tksGet :: Ord k => TimestampedKey k -> s k v -> IO (Maybe v)
+  tksPut :: Ord k => TimestampedKey k -> v -> s k v -> IO ()
+  tksRange :: Ord k => TimestampedKey k -> TimestampedKey k -> s k v -> IO [(TimestampedKey k, v)]
+
+data InMemoryTimestampedKVStore k v = InMemoryTimestampedKVStore
+  { imtksData :: IORef (Map Int64 (IORef (Map k v)))
+  }
+
+mkInMemoryTimestampedKVStore :: IO (InMemoryTimestampedKVStore k v)
+mkInMemoryTimestampedKVStore = do
+  internalData <- newIORef Map.empty
+  return
+    InMemoryTimestampedKVStore
+      { imtksData = internalData
+      }
+
+instance TimestampedKVStore InMemoryTimestampedKVStore where
+  tksGet TimestampedKey {..} InMemoryTimestampedKVStore {..} = do
+    map1 <- readIORef imtksData
+    case Map.lookup tkTimestamp map1 of
+      Just rmap2 -> do
+        map2 <- readIORef rmap2
+        return $ Map.lookup tkKey map2
+      Nothing -> return Nothing
+
+  tksPut TimestampedKey {..} v InMemoryTimestampedKVStore {..} = do
+    map1 <- readIORef imtksData
+    case Map.lookup tkTimestamp map1 of
+      Just rmap2 -> do
+        map2 <- readIORef rmap2
+        let newMap2 = Map.insert tkKey v map2
+        writeIORef rmap2 newMap2
+      Nothing -> do
+        let map2 = Map.singleton tkKey v
+        rmap2 <- newIORef map2
+        let newMap1 = Map.insert tkTimestamp rmap2 map1
+        writeIORef imtksData newMap1
+
+  tksRange fromKey toKey InMemoryTimestampedKVStore {..} = do
+    map1 <- readIORef imtksData
+    let (_, ms, lm) = Map.splitLookup (tkTimestamp fromKey) map1
+    let (sm, ml, _) = Map.splitLookup (tkTimestamp toKey) lm
+    let r1 = do
+          r0 <- fmap (\v -> Map.insert (tkTimestamp fromKey) v sm) ms
+          fmap (\v -> Map.insert (tkTimestamp toKey) v r0) ml
+    let innerKey = tkKey fromKey
+    case r1 of
+      Just rm -> genR innerKey rm
+      Nothing -> genR innerKey sm
+    where
+      genR :: Ord k => k -> Map Int64 (IORef (Map k v)) -> IO [(TimestampedKey k, v)]
+      -- 需要遍历这个 map,
+      -- 找到 key 匹配的然后返回.
+      genR key dict =
+        Map.foldlWithKey'
+          ( \macc ts rmap2 -> do
+              acc <- macc
+              map2 <- readIORef rmap2
+              case Map.lookup key map2 of
+                Just v -> return $ acc ++ [(mkTimestampedKey key ts, v)]
+                Nothing -> return acc
+          )
+          (return [])
+          dict
+
+data ETimestampedKVStore k v
+  = forall s.
+    TimestampedKVStore s =>
+    ETimestampedKVStore (s k v)
+
+data DETimestampedKVStore
+  = forall k v.
+    (Typeable k, Typeable v) =>
+    DETimestampedKVStore (ETimestampedKVStore k v)
+
+fromDETimestampedKVStoreToETimestampedKVStore ::
+  (Typeable k, Typeable v, Ord k) =>
+  DETimestampedKVStore ->
+  ETimestampedKVStore k v
+fromDETimestampedKVStoreToETimestampedKVStore (DETimestampedKVStore eStore) =
+  case cast eStore of
+    Just es -> es
+    Nothing -> throw $ TypeCastError "fromDEKVStoreToEKVStore: type cast error"
+
+instance TimestampedKVStore ETimestampedKVStore where
+  tksGet k (ETimestampedKVStore s) = tksGet k s
+
+  tksPut k v (ETimestampedKVStore s) = tksPut k v s
+
+  tksRange fromKey toKey (ETimestampedKVStore s) = tksRange fromKey toKey s

@@ -6,7 +6,6 @@
 
 module HStream.Processor.Internal where
 
-import Control.Comonad.Traced
 import Control.Exception (throw)
 import Data.Default
 import Data.Typeable
@@ -43,7 +42,8 @@ mkERecord :: (Typeable k, Typeable v) => Record k v -> ERecord
 mkERecord = ERecord
 
 data TaskTopologyConfig = TaskTopologyConfig
-  { sourceCfgs :: HM.HashMap T.Text InternalSourceConfig,
+  { ttcName :: T.Text,
+    sourceCfgs :: HM.HashMap T.Text InternalSourceConfig,
     topology :: HM.HashMap T.Text (EProcessor, [T.Text]),
     sinkCfgs :: HM.HashMap T.Text InternalSinkConfig,
     stores :: HM.HashMap T.Text (EStateStore, HS.HashSet T.Text)
@@ -52,7 +52,8 @@ data TaskTopologyConfig = TaskTopologyConfig
 instance Default TaskTopologyConfig where
   def =
     TaskTopologyConfig
-      { sourceCfgs = HM.empty,
+      { ttcName = T.empty,
+        sourceCfgs = HM.empty,
         topology = HM.empty,
         sinkCfgs = HM.empty,
         stores = HM.empty
@@ -61,7 +62,8 @@ instance Default TaskTopologyConfig where
 instance Semigroup TaskTopologyConfig where
   t1 <> t2 =
     TaskTopologyConfig
-      { sourceCfgs =
+      { ttcName = ttcName t1,
+        sourceCfgs =
           HM.unionWithKey
             ( \name _ _ ->
                 throw $
@@ -108,7 +110,7 @@ data InternalSinkConfig = InternalSinkConfig
     iSinkTopicName :: T.Text
   }
 
-type TaskBuilder = Traced TaskTopologyConfig Task
+type TaskBuilder = TaskTopologyConfig
 
 data Task = Task
   { taskName :: T.Text,

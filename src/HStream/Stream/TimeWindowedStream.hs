@@ -40,8 +40,8 @@ aggregate initialValue aggF Materialized {..} TimeWindowedStream {..} = do
   processorName <- mkInternalProcessorName "TIME-WINDOWED-STREAM-AGGREGATE-" twsInternalBuilder
   let storeName = mkInternalStoreName processorName
   let p = aggregateProcessor storeName initialValue aggF mKeySerde mValueSerde twsTimeWindows
-  builder' <- addProcessorInternal processorName p [twsProcessorName] twsInternalBuilder
-  newBuilder <- addStateStoreInternal storeName mStateStore [processorName] builder'
+  let builder' = addProcessorInternal processorName p [twsProcessorName] twsInternalBuilder
+  let newBuilder = addStateStoreInternal storeName mStateStore [processorName] builder'
   return
     Table
       { tableInternalBuilder = newBuilder,
