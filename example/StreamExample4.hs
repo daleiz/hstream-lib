@@ -118,9 +118,10 @@ main = do
   store2 <- mkInMemoryStateTimestampedKVStore
   let streamJoined =
         HS.StreamJoined
-          { sjV1Serde = r1Serde,
+          { sjK1Serde = textSerde,
+            sjV1Serde = r1Serde,
+            sjK2Serde = textSerde,
             sjV2Serde = r2Serde,
-            sjKeySerde = textSerde,
             sjThisStore = store1,
             sjOtherStore = store2
           }
@@ -128,7 +129,7 @@ main = do
   streamBuilder <-
     HS.mkStreamBuilder "demo"
       >>= HS.stream streamSourceConfig1
-      >>= HS.joinStream stream2 joiner joinWindows streamJoined
+      >>= HS.joinStream stream2 joiner keySelector1 keySelector2 joinWindows streamJoined
       >>= HS.filter filterR
       >>= HS.to streamSinkConfig
 
@@ -179,6 +180,12 @@ joiner R1 {..} R2 {..} =
     { temperature = r1Temperature,
       humidity = r2Humidity
     }
+
+keySelector1 :: Record TL.Text R1 -> TL.Text
+keySelector1 = fromJust . recordKey
+
+keySelector2 :: Record TL.Text R2 -> TL.Text
+keySelector2 = fromJust . recordKey
 
 filterR :: Record TL.Text R -> Bool
 filterR Record {..} =

@@ -163,23 +163,26 @@ groupBy f Stream {..} = do
         gsValueSerde = Nothing
       }
 
-data StreamJoined k v1 v2 = StreamJoined
-  { sjKeySerde :: Serde k,
+data StreamJoined k1 v1 k2 v2 = StreamJoined
+  { sjK1Serde :: Serde k1,
     sjV1Serde :: Serde v1,
+    sjK2Serde :: Serde k2,
     sjV2Serde :: Serde v2,
     sjThisStore :: StateStore BL.ByteString BL.ByteString,
     sjOtherStore :: StateStore BL.ByteString BL.ByteString
   }
 
 joinStream ::
-  (Typeable k, Typeable v1, Typeable v2, Typeable v3) =>
-  Stream k v2 ->
+  (Typeable k1, Typeable v1, Typeable k2, Typeable v2, Typeable k3, Typeable v3, Eq k3) =>
+  Stream k2 v2 ->
   (v1 -> v2 -> v3) ->
+  (Record k1 v1 -> k3) ->
+  (Record k2 v2 -> k3) ->
   JoinWindows ->
-  StreamJoined k v1 v2 ->
-  Stream k v1 ->
-  IO (Stream k v3)
-joinStream otherStream joiner JoinWindows {..} StreamJoined {..} thisStream = do
+  StreamJoined k1 v1 k2 v2 ->
+  Stream k1 v1 ->
+  IO (Stream k3 v3)
+joinStream otherStream joiner thisKeySelector otherKeySelector JoinWindows {..} StreamJoined {..} thisStream = do
   let mergedStreamBuilder = mergeInternalStreamBuilder (streamInternalBuilder thisStream) (streamInternalBuilder otherStream)
   thisJoinProcessorName <- mkInternalProcessorName "STREAM-JOIN-STREAM-THIS-" mergedStreamBuilder
   let thisJoinStoreName = mkInternalStoreName thisJoinProcessorName
@@ -188,8 +191,8 @@ joinStream otherStream joiner JoinWindows {..} StreamJoined {..} thisStream = do
 
   -- ts1 - beforeMs <= ts2 <= ts1 + afterMs
   -- ts2 - afterMs <= ts1 <= ts2 + beforeMs
-  let thisJoinProcessor = joinStreamProcessor joiner jwBeforeMs jwAfterMs thisJoinStoreName otherJoinStoreName sjKeySerde sjV1Serde sjV2Serde
-  let otherJoinProcessor = joinStreamProcessor (flip joiner) jwAfterMs jwBeforeMs otherJoinStoreName thisJoinStoreName sjKeySerde sjV2Serde sjV1Serde
+  let thisJoinProcessor = joinStreamProcessor joiner thisKeySelector otherKeySelector jwBeforeMs jwAfterMs thisJoinStoreName otherJoinStoreName sjK1Serde sjV1Serde sjK2Serde sjV2Serde
+  let otherJoinProcessor = joinStreamProcessor (flip joiner) otherKeySelector thisKeySelector jwAfterMs jwBeforeMs otherJoinStoreName thisJoinStoreName sjK2Serde sjV2Serde sjK1Serde sjV1Serde
   mergeProcessorName <- mkInternalProcessorName "PASSTHROUGH-" mergedStreamBuilder
   let mergeProcessor = passThroughProcessor thisStream joiner
 
@@ -203,7 +206,7 @@ joinStream otherStream joiner JoinWindows {..} StreamJoined {..} thisStream = do
 
   return
     Stream
-      { streamKeySerde = Just sjKeySerde,
+      { streamKeySerde = Nothing,
         streamValueSerde = Nothing,
         streamProcessorName = mergeProcessorName,
         streamInternalBuilder = mergedStreamBuilder {isbTaskBuilder = newTaskBuilder}
@@ -218,30 +221,37 @@ joinStream otherStream joiner JoinWindows {..} StreamJoined {..} thisStream = do
       forward r
 
 joinStreamProcessor ::
-  (Typeable k, Typeable v1, Typeable v2, Typeable v3) =>
+  (Typeable k1, Typeable v1, Typeable k2, Typeable v2, Typeable k3, Typeable v3, Eq k3) =>
   (v1 -> v2 -> v3) ->
+  (Record k1 v1 -> k3) ->
+  (Record k2 v2 -> k3) ->
   Int64 ->
   Int64 ->
   Text ->
   Text ->
-  Serde k ->
+  Serde k1 ->
   Serde v1 ->
+  Serde k2 ->
   Serde v2 ->
-  Processor k v1
-joinStreamProcessor joiner beforeMs afterMs storeName1 storeName2 keySerde v1Serde v2Serde = Processor $ \r@Record {..} -> do
+  Processor k1 v1
+joinStreamProcessor joiner keySelector1 keySelector2 beforeMs afterMs storeName1 storeName2 k1Serde v1Serde k2Serde v2Serde = Processor $ \r1@Record {..} -> do
   store1 <- getTimestampedKVStateStore storeName1
-  let key = fromJust recordKey
-  let keyBytes = runSer (serializer keySerde) key
+  let k1 = fromJust recordKey
+  let k1Bytes = runSer (serializer k1Serde) k1
   let v1Bytes = runSer (serializer v1Serde) recordValue
-  liftIO $ tksPut (mkTimestampedKey keyBytes recordTimestamp) v1Bytes store1
+  liftIO $ tksPut (mkTimestampedKey k1Bytes recordTimestamp) v1Bytes store1
 
   store2 <- getTimestampedKVStateStore storeName2
-  candinates <- liftIO $ tksRange (mkTimestampedKey keyBytes $ recordTimestamp - beforeMs) (mkTimestampedKey keyBytes $ recordTimestamp + afterMs) store2
+  candinates <- liftIO $ tksRange (mkTimestampedKey k1Bytes $ recordTimestamp - beforeMs) (mkTimestampedKey k1Bytes $ recordTimestamp + afterMs) store2
   forM_
     candinates
     ( \(timestampedKey, v2Bytes) -> do
+        let k2 = runDeser (deserializer k2Serde) (tkKey timestampedKey)
         let v2 = runDeser (deserializer v2Serde) v2Bytes
-        let v3 = joiner recordValue v2
         let ts2 = tkTimestamp timestampedKey
-        forward $ r {recordValue = v3, recordTimestamp = max recordTimestamp ts2}
+        let jk1 = keySelector1 r1
+        let jk2 = keySelector2 Record {recordKey = Just k2, recordValue = v2, recordTimestamp = ts2}
+        when (jk1 == jk2) $ do
+          let v3 = joiner recordValue v2
+          forward $ Record {recordKey = Just jk1, recordValue = v3, recordTimestamp = max recordTimestamp ts2}
     )
