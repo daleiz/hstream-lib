@@ -89,9 +89,8 @@ instance Semigroup TaskTopologyConfig where
             (sinkCfgs t2),
         stores =
           HM.unionWithKey
-            ( \name _ _ ->
-                throw $
-                  TaskTopologyBuildError $ "store named " `T.append` name `T.append` " already existed"
+            ( \_ (s1, processors1) (_, processors2) ->
+                (s1, HS.union processors2 processors1)
             )
             (stores t1)
             (stores t2)
@@ -153,3 +152,20 @@ updateTimestampInTaskContext TaskContext {..} recordTimestamp = do
 
 getTimestampInTaskContext :: TaskContext -> IO Timestamp
 getTimestampInTaskContext TaskContext {..} = readIORef tcTimestamp
+
+getStateStoreFromTaskBuilder :: T.Text -> TaskBuilder -> Maybe EStateStore
+getStateStoreFromTaskBuilder storeName TaskTopologyConfig {..} =
+  fst <$> HM.lookup storeName stores
+
+addEStateStore ::
+  T.Text ->
+  EStateStore ->
+  [T.Text] ->
+  TaskBuilder
+addEStateStore storeName store processors =
+  mempty
+    { stores =
+        HM.singleton
+          storeName
+          (store, HS.fromList processors)
+    }

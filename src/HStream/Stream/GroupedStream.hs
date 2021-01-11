@@ -50,7 +50,8 @@ aggregate initialValue aggF Materialized {..} GroupedStream {..} = do
       { tableInternalBuilder = newBuilder,
         tableProcessorName = processorName,
         tableKeySerde = Just mKeySerde,
-        tableValueSerde = Just mValueSerde
+        tableValueSerde = Just mValueSerde,
+        tableStoreName = storeName
       }
 
 count ::

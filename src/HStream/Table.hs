@@ -17,6 +17,7 @@ data Table k v = Table
   { tableKeySerde :: Maybe (Serde k),
     tableValueSerde :: Maybe (Serde v),
     tableProcessorName :: T.Text,
+    tableStoreName :: T.Text,
     tableInternalBuilder :: InternalStreamBuilder
   }
 

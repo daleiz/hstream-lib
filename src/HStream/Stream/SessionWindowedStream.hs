@@ -49,7 +49,8 @@ aggregate initialValue aggF sessionMergeF Materialized {..} SessionWindowedStrea
       { tableInternalBuilder = newBuilder,
         tableProcessorName = processorName,
         tableKeySerde = Just (sessionWindowKeySerde mKeySerde),
-        tableValueSerde = Just mValueSerde
+        tableValueSerde = Just mValueSerde,
+        tableStoreName = storeName
       }
 
 count ::

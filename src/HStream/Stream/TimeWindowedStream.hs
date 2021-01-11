@@ -47,7 +47,8 @@ aggregate initialValue aggF Materialized {..} TimeWindowedStream {..} = do
       { tableInternalBuilder = newBuilder,
         tableProcessorName = processorName,
         tableKeySerde = Just (timeWindowKeySerde mKeySerde (twSizeMs twsTimeWindows)),
-        tableValueSerde = Just mValueSerde
+        tableValueSerde = Just mValueSerde,
+        tableStoreName = storeName
       }
 
 count ::
