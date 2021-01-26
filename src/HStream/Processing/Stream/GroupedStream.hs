@@ -23,7 +23,7 @@ import           HStream.Processing.Stream.TimeWindowedStream    (TimeWindowedSt
 import           HStream.Processing.Stream.TimeWindows
 import           HStream.Processing.Table
 import           RIO
-import qualified RIO.Text                             as T
+import qualified RIO.Text                                        as T
 
 data GroupedStream k v
   = GroupedStream

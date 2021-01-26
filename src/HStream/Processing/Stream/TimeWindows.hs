@@ -18,7 +18,7 @@ module HStream.Processing.Stream.TimeWindows
 where
 
 import           Data.Binary.Get
-import qualified Data.ByteString.Builder as BB
+import qualified Data.ByteString.Builder     as BB
 import           HStream.Processing.Encoding
 import           RIO
 
@@ -27,12 +27,6 @@ data TimeWindows
       { twSizeMs :: Int64,
         twAdvanceMs :: Int64,
         twGraceMs :: Int64
-      }
-
-data SessionWindows
-  = SessionWindows
-      { swInactivityGap :: Int64,
-        swGraceMs :: Int64
       }
 
 mkTumblingWindow :: Int64 -> TimeWindows

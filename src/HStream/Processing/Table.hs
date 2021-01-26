@@ -11,7 +11,7 @@ where
 import           HStream.Processing.Encoding
 import           HStream.Processing.Stream.Internal
 import           RIO
-import qualified RIO.Text                as T
+import qualified RIO.Text                           as T
 
 data Table k v
   = Table

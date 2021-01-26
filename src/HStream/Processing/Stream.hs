@@ -37,8 +37,8 @@ import           HStream.Processing.Table
 import           HStream.Processing.Topic
 import           HStream.Processing.Type
 import           RIO
-import qualified RIO.ByteString.Lazy          as BL
-import qualified RIO.Text                     as T
+import qualified RIO.ByteString.Lazy                     as BL
+import qualified RIO.Text                                as T
 
 data StreamBuilder
   = StreamBuilder

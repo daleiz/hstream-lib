@@ -6,16 +6,16 @@
 
 import           Data.Aeson
 import           Data.Maybe
-import qualified Data.Text.Lazy          as TL
-import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Text.Lazy               as TL
+import qualified Data.Text.Lazy.Encoding      as TLE
 import           HStream.Processing.Encoding
 import           HStream.Processing.Processor
-import qualified HStream.Processing.Stream          as HS
+import qualified HStream.Processing.Stream    as HS
 import           HStream.Processing.Topic
 import           HStream.Processing.Util
-import qualified Prelude                 as P
+import qualified Prelude                      as P
 import           RIO
-import qualified RIO.ByteString.Lazy     as BL
+import qualified RIO.ByteString.Lazy          as BL
 import           System.Random
 
 data R

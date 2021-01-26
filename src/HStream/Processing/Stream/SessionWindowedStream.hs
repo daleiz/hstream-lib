@@ -20,7 +20,7 @@ import           HStream.Processing.Stream.SessionWindows
 import           HStream.Processing.Stream.TimeWindows
 import           HStream.Processing.Table
 import           RIO
-import qualified RIO.Text                      as T
+import qualified RIO.Text                                 as T
 
 data SessionWindowedStream k v
   = SessionWindowedStream

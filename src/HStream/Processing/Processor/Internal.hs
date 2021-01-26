@@ -6,16 +6,16 @@
 
 module HStream.Processing.Processor.Internal where
 
-import           Control.Exception (throw)
+import           Control.Exception        (throw)
 import           Data.Default
 import           Data.Typeable
-import           HStream.Processing.Error     (HStreamError (..))
+import           HStream.Processing.Error (HStreamError (..))
 import           HStream.Processing.Store
 import           HStream.Processing.Type
 import           RIO
-import qualified RIO.HashMap       as HM
-import qualified RIO.HashSet       as HS
-import qualified RIO.Text          as T
+import qualified RIO.HashMap              as HM
+import qualified RIO.HashSet              as HS
+import qualified RIO.Text                 as T
 
 newtype Processor kin vin = Processor {runP :: Record kin vin -> RIO TaskContext ()}
 

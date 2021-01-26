@@ -14,7 +14,7 @@ module HStream.Processing.Stream.SessionWindows
 where
 
 import           Data.Binary.Get
-import qualified Data.ByteString.Builder    as BB
+import qualified Data.ByteString.Builder               as BB
 import           HStream.Processing.Encoding
 import           HStream.Processing.Stream.TimeWindows
 import           RIO
@@ -40,9 +40,6 @@ sessionWindowKeySerializer kSerializer = Serializer $ \TimeWindowKey {..} ->
       bytesBuilder = BB.int64BE (tWindowStart twkWindow) <> BB.int64BE (tWindowEnd twkWindow) <> BB.lazyByteString keyBytes
    in BB.toLazyByteString bytesBuilder
 
--- 为了反序列化出 TimeWindow,
--- 还需要传入 WindowSize,
--- 因为序列化的时候仅仅传入了 windowStartTimestamp.
 sessionWindowKeyDeserializer :: Deserializer k -> Deserializer (TimeWindowKey k)
 sessionWindowKeyDeserializer kDeserializer = Deserializer $ runGet decodeWindowKey
   where

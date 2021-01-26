@@ -29,7 +29,7 @@ module HStream.Processing.Processor
   )
 where
 
-import           Control.Exception          (throw)
+import           Control.Exception                     (throw)
 import           Data.Maybe
 import           Data.Typeable
 import           HStream.Processing.Encoding
@@ -39,12 +39,12 @@ import           HStream.Processing.Store
 import           HStream.Processing.Topic
 import           HStream.Processing.Util
 import           RIO
-import qualified RIO.ByteString.Lazy        as BL
-import qualified RIO.HashMap                as HM
-import           RIO.HashMap.Partial        as HM'
-import qualified RIO.HashSet                as HS
-import qualified RIO.List                   as L
-import qualified RIO.Text                   as T
+import qualified RIO.ByteString.Lazy                   as BL
+import qualified RIO.HashMap                           as HM
+import           RIO.HashMap.Partial                   as HM'
+import qualified RIO.HashSet                           as HS
+import qualified RIO.List                              as L
+import qualified RIO.Text                              as T
 
 -- import qualified Prelude as P
 
@@ -191,35 +191,6 @@ buildInternalSinkProcessor producer InternalSinkConfig {..} = Processor $ \Recor
           rprValue = recordValue,
           rprTimestamp = ts
         }
-
--- why this not work?
--- can not deduce k v,
--- 这没有理由啊，
--- record 上肯定能执行 cast 操作的,
--- 这里是否能 cast 成任意的值？
--- 关键是下面也没有出现能推断 k v 类型的信息，
--- 所有后半段没法成立.
--- 反正要给后半段一个能推断出来的类型.
--- 它这个类型信息其实就在 serializer 里面.
---
--- 所以必须留下未包装的 serailizer,
--- 也就是在开始的时候就构建
---
---
--- case cast record of
---   Just Record {..} -> do
---     -- serialize and write to topic
---     logDebug "enter sink processor"
---     let rk = liftA2 runESer iKeySerializer (fmap mkEV recordKey)
---     let rv = runESer iValueSerializer (mkEV recordValue)
---     liftIO $
---       send
---         producer
---         RawProducerRecord
---           { rprTopic = iSinkTopicName,
---             rprKey = rk,
---             rprValue = rv
---           }
 
 addSink ::
   (Typeable k, Typeable v) =>

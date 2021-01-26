@@ -5,19 +5,19 @@
 {-# LANGUAGE StrictData        #-}
 
 import           Data.Aeson
-import qualified Data.Binary             as B
+import qualified Data.Binary                  as B
 import           Data.Maybe
-import qualified Data.Text               as T
-import qualified Data.Text.Lazy          as TL
-import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Text                    as T
+import qualified Data.Text.Lazy               as TL
+import qualified Data.Text.Lazy.Encoding      as TLE
 import           HStream.Processing.Encoding
 import           HStream.Processing.Processor
 import           HStream.Processing.Store
 import           HStream.Processing.Topic
 import           HStream.Processing.Util
-import qualified Prelude                 as P
+import qualified Prelude                      as P
 import           RIO
-import qualified RIO.ByteString.Lazy     as BL
+import qualified RIO.ByteString.Lazy          as BL
 import           System.Random
 
 data R

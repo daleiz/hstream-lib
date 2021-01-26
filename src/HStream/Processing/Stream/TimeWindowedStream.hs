@@ -19,7 +19,7 @@ import           HStream.Processing.Stream.Internal
 import           HStream.Processing.Stream.TimeWindows
 import           HStream.Processing.Table
 import           RIO
-import qualified RIO.Text                   as T
+import qualified RIO.Text                              as T
 
 data TimeWindowedStream k v
   = TimeWindowedStream

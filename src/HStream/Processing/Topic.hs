@@ -14,8 +14,8 @@ where
 
 import           HStream.Processing.Type
 import           RIO
-import qualified RIO.ByteString.Lazy as BL
-import qualified RIO.Text            as T
+import qualified RIO.ByteString.Lazy     as BL
+import qualified RIO.Text                as T
 
 type TopicName = T.Text
 
