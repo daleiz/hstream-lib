@@ -24,23 +24,23 @@ source-repository head
 
 library
   exposed-modules:
-    HStream.Encoding
-    HStream.Error
-    HStream.Processor
-    HStream.Processor.Internal
-    HStream.Store
-    HStream.Stream
-    HStream.Stream.GroupedStream
-    HStream.Stream.Internal
-    HStream.Stream.JoinWindows
-    HStream.Stream.SessionWindowedStream
-    HStream.Stream.SessionWindows
-    HStream.Stream.TimeWindowedStream
-    HStream.Stream.TimeWindows
-    HStream.Table
-    HStream.Topic
-    HStream.Type
-    HStream.Util
+    HStream.Processing.Encoding
+    HStream.Processing.Error
+    HStream.Processing.Processor
+    HStream.Processing.Processor.Internal
+    HStream.Processing.Store
+    HStream.Processing.Stream
+    HStream.Processing.Stream.GroupedStream
+    HStream.Processing.Stream.Internal
+    HStream.Processing.Stream.JoinWindows
+    HStream.Processing.Stream.SessionWindowedStream
+    HStream.Processing.Stream.SessionWindows
+    HStream.Processing.Stream.TimeWindowedStream
+    HStream.Processing.Stream.TimeWindows
+    HStream.Processing.Table
+    HStream.Processing.Topic
+    HStream.Processing.Type
+    HStream.Processing.Util
 
   hs-source-dirs:   src
   build-depends:

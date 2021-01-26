@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude         #-}
 {-# LANGUAGE StrictData                #-}
 
-module HStream.Encoding
+module HStream.Processing.Encoding
   ( voidSerializer,
     voidDeserializer,
     Deserializer (..),

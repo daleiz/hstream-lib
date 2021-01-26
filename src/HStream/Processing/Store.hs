@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE StrictData                #-}
 
-module HStream.Store
+module HStream.Processing.Store
   ( KVStore (..),
     SessionStore (..),
     TimestampedKVStore (..),
@@ -32,10 +32,10 @@ where
 import           Control.Exception             (throw)
 import           Data.Maybe
 import           Data.Typeable
-import           HStream.Error
-import           HStream.Stream.SessionWindows
-import           HStream.Stream.TimeWindows
-import           HStream.Type
+import           HStream.Processing.Error
+import           HStream.Processing.Stream.SessionWindows
+import           HStream.Processing.Stream.TimeWindows
+import           HStream.Processing.Type
 import           RIO
 import qualified RIO.Map                       as Map
 import qualified RIO.Text                      as T

@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Stream.SessionWindows
+module HStream.Processing.Stream.SessionWindows
   ( SessionWindows (..),
     mkSessionWindows,
     SessionWindowKey,
@@ -15,8 +15,8 @@ where
 
 import           Data.Binary.Get
 import qualified Data.ByteString.Builder    as BB
-import           HStream.Encoding
-import           HStream.Stream.TimeWindows
+import           HStream.Processing.Encoding
+import           HStream.Processing.Stream.TimeWindows
 import           RIO
 
 data SessionWindows

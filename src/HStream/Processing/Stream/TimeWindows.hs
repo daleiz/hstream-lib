@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Stream.TimeWindows
+module HStream.Processing.Stream.TimeWindows
   ( TimeWindow (..),
     TimeWindows (..),
     TimeWindowKey (..),
@@ -19,7 +19,7 @@ where
 
 import           Data.Binary.Get
 import qualified Data.ByteString.Builder as BB
-import           HStream.Encoding
+import           HStream.Processing.Encoding
 import           RIO
 
 data TimeWindows

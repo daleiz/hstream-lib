@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Topic
+module HStream.Processing.Topic
   ( TopicName,
     Offset,
     Timestamp,
@@ -12,7 +12,7 @@ module HStream.Topic
   )
 where
 
-import           HStream.Type
+import           HStream.Processing.Type
 import           RIO
 import qualified RIO.ByteString.Lazy as BL
 import qualified RIO.Text            as T

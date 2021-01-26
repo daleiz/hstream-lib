@@ -8,13 +8,13 @@ import           Data.Aeson
 import           Data.Maybe
 import qualified Data.Text.Lazy             as TL
 import qualified Data.Text.Lazy.Encoding    as TLE
-import           HStream.Encoding
-import           HStream.Processor
-import           HStream.Store
-import qualified HStream.Stream             as HS
-import           HStream.Stream.JoinWindows
-import           HStream.Topic
-import           HStream.Util
+import           HStream.Processing.Encoding
+import           HStream.Processing.Processor
+import           HStream.Processing.Store
+import qualified HStream.Processing.Stream             as HS
+import           HStream.Processing.Stream.JoinWindows
+import           HStream.Processing.Topic
+import           HStream.Processing.Util
 import qualified Prelude                    as P
 import           RIO
 import qualified RIO.ByteString.Lazy        as BL

@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Stream.GroupedStream
+module HStream.Processing.Stream.GroupedStream
   ( GroupedStream (..),
     aggregate,
     count,
@@ -13,15 +13,15 @@ module HStream.Stream.GroupedStream
 where
 
 import           Data.Maybe
-import           HStream.Encoding
-import           HStream.Processor
-import           HStream.Store
-import           HStream.Stream.Internal
-import           HStream.Stream.SessionWindowedStream (SessionWindowedStream (..))
-import           HStream.Stream.SessionWindows
-import           HStream.Stream.TimeWindowedStream    (TimeWindowedStream (..))
-import           HStream.Stream.TimeWindows
-import           HStream.Table
+import           HStream.Processing.Encoding
+import           HStream.Processing.Processor
+import           HStream.Processing.Store
+import           HStream.Processing.Stream.Internal
+import           HStream.Processing.Stream.SessionWindowedStream (SessionWindowedStream (..))
+import           HStream.Processing.Stream.SessionWindows
+import           HStream.Processing.Stream.TimeWindowedStream    (TimeWindowedStream (..))
+import           HStream.Processing.Stream.TimeWindows
+import           HStream.Processing.Table
 import           RIO
 import qualified RIO.Text                             as T
 

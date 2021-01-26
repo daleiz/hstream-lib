@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Stream.TimeWindowedStream
+module HStream.Processing.Stream.TimeWindowedStream
   ( TimeWindowedStream (..),
     aggregate,
     count,
@@ -11,13 +11,13 @@ module HStream.Stream.TimeWindowedStream
 where
 
 import           Data.Maybe
-import           HStream.Encoding
-import           HStream.Processor
-import           HStream.Processor.Internal
-import           HStream.Store
-import           HStream.Stream.Internal
-import           HStream.Stream.TimeWindows
-import           HStream.Table
+import           HStream.Processing.Encoding
+import           HStream.Processing.Processor
+import           HStream.Processing.Processor.Internal
+import           HStream.Processing.Store
+import           HStream.Processing.Stream.Internal
+import           HStream.Processing.Stream.TimeWindows
+import           HStream.Processing.Table
 import           RIO
 import qualified RIO.Text                   as T
 

@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Processor
+module HStream.Processing.Processor
   ( buildTask,
     build,
     addSource,
@@ -32,12 +32,12 @@ where
 import           Control.Exception          (throw)
 import           Data.Maybe
 import           Data.Typeable
-import           HStream.Encoding
-import           HStream.Error              (HStreamError (..))
-import           HStream.Processor.Internal
-import           HStream.Store
-import           HStream.Topic
-import           HStream.Util
+import           HStream.Processing.Encoding
+import           HStream.Processing.Error              (HStreamError (..))
+import           HStream.Processing.Processor.Internal
+import           HStream.Processing.Store
+import           HStream.Processing.Topic
+import           HStream.Processing.Util
 import           RIO
 import qualified RIO.ByteString.Lazy        as BL
 import qualified RIO.HashMap                as HM

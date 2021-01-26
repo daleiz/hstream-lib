@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Type
+module HStream.Processing.Type
   ( Timestamp,
     TimestampedKey (..),
     mkTimestampedKey,

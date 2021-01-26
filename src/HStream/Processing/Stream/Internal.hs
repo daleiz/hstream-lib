@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Stream.Internal
+module HStream.Processing.Stream.Internal
   ( InternalStreamBuilder (..),
     Stream (..),
     Materialized (..),
@@ -20,10 +20,10 @@ module HStream.Stream.Internal
   )
 where
 
-import           HStream.Encoding
-import           HStream.Processor
-import           HStream.Processor.Internal
-import           HStream.Store
+import           HStream.Processing.Encoding
+import           HStream.Processing.Processor
+import           HStream.Processing.Processor.Internal
+import           HStream.Processing.Store
 import           RIO
 import qualified RIO.ByteString.Lazy        as BL
 import qualified RIO.Text                   as T

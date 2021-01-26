@@ -3,18 +3,18 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Stream
+module HStream.Processing.Stream
   ( mkStreamBuilder,
     mkStream,
-    HStream.Stream.stream,
-    HStream.Stream.table,
-    HStream.Stream.build,
-    HStream.Stream.to,
-    HStream.Stream.filter,
-    HStream.Stream.map,
-    HStream.Stream.groupBy,
-    HStream.Stream.joinStream,
-    HStream.Stream.joinTable,
+    HStream.Processing.Stream.stream,
+    HStream.Processing.Stream.table,
+    HStream.Processing.Stream.build,
+    HStream.Processing.Stream.to,
+    HStream.Processing.Stream.filter,
+    HStream.Processing.Stream.map,
+    HStream.Processing.Stream.groupBy,
+    HStream.Processing.Stream.joinStream,
+    HStream.Processing.Stream.joinTable,
     Stream,
     StreamBuilder,
     StreamSourceConfig (..),
@@ -26,16 +26,16 @@ module HStream.Stream
 where
 
 import           Data.Maybe
-import           HStream.Encoding
-import           HStream.Processor
-import           HStream.Processor.Internal
-import           HStream.Store
-import           HStream.Stream.GroupedStream
-import           HStream.Stream.Internal
-import           HStream.Stream.JoinWindows
-import           HStream.Table
-import           HStream.Topic
-import           HStream.Type
+import           HStream.Processing.Encoding
+import           HStream.Processing.Processor
+import           HStream.Processing.Processor.Internal
+import           HStream.Processing.Store
+import           HStream.Processing.Stream.GroupedStream
+import           HStream.Processing.Stream.Internal
+import           HStream.Processing.Stream.JoinWindows
+import           HStream.Processing.Table
+import           HStream.Processing.Topic
+import           HStream.Processing.Type
 import           RIO
 import qualified RIO.ByteString.Lazy          as BL
 import qualified RIO.Text                     as T

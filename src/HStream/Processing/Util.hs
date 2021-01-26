@@ -1,14 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Util
+module HStream.Processing.Util
   ( getCurrentTimestamp,
   )
 where
 
 import           Data.Time
 import           Data.Time.Clock.POSIX
-import           HStream.Type
+import           HStream.Processing.Type
 import           RIO
 
 posixTimeToMilliSeconds :: POSIXTime -> Timestamp

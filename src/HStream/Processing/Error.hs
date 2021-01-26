@@ -1,7 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Error
+module HStream.Processing.Error
   ( HStreamError (..),
   )
 where

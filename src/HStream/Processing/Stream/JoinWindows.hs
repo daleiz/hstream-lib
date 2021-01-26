@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Stream.JoinWindows
+module HStream.Processing.Stream.JoinWindows
   ( JoinWindows (..),
   )
 where

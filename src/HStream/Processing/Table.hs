@@ -2,14 +2,14 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE StrictData        #-}
 
-module HStream.Table
+module HStream.Processing.Table
   ( Table (..),
     toStream,
   )
 where
 
-import           HStream.Encoding
-import           HStream.Stream.Internal
+import           HStream.Processing.Encoding
+import           HStream.Processing.Stream.Internal
 import           RIO
 import qualified RIO.Text                as T
 
