@@ -1,17 +1,18 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Stream.JoinWindows
   ( JoinWindows (..),
   )
 where
 
-import RIO
+import           RIO
 
-data JoinWindows = JoinWindows
-  { jwBeforeMs :: Int64,
-    jwAfterMs :: Int64,
-    jwGraceMs :: Int64
-  }
+data JoinWindows
+  = JoinWindows
+      { jwBeforeMs :: Int64,
+        jwAfterMs :: Int64,
+        jwGraceMs :: Int64
+      }

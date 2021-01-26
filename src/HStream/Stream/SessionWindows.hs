@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Stream.SessionWindows
   ( SessionWindows (..),
@@ -13,16 +13,17 @@ module HStream.Stream.SessionWindows
   )
 where
 
-import Data.Binary.Get
-import qualified Data.ByteString.Builder as BB
-import HStream.Encoding
-import HStream.Stream.TimeWindows
-import RIO
+import           Data.Binary.Get
+import qualified Data.ByteString.Builder    as BB
+import           HStream.Encoding
+import           HStream.Stream.TimeWindows
+import           RIO
 
-data SessionWindows = SessionWindows
-  { swInactivityGap :: Int64,
-    swGraceMs :: Int64
-  }
+data SessionWindows
+  = SessionWindows
+      { swInactivityGap :: Int64,
+        swGraceMs :: Int64
+      }
 
 mkSessionWindows :: Int64 -> SessionWindows
 mkSessionWindows inactivityGap =

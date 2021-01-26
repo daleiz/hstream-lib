@@ -1,5 +1,5 @@
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Type
   ( Timestamp,
@@ -8,14 +8,15 @@ module HStream.Type
   )
 where
 
-import RIO
+import           RIO
 
 type Timestamp = Int64
 
-data TimestampedKey k = TimestampedKey
-  { tkKey :: k,
-    tkTimestamp :: Timestamp
-  }
+data TimestampedKey k
+  = TimestampedKey
+      { tkKey :: k,
+        tkTimestamp :: Timestamp
+      }
 
 mkTimestampedKey :: k -> Timestamp -> TimestampedKey k
 mkTimestampedKey key timestamp =

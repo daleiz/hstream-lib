@@ -1,6 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE StrictData #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE StrictData                #-}
 
 module HStream.Encoding
   ( voidSerializer,
@@ -14,24 +14,24 @@ where
 -- import Control.Exception (throw)
 -- import Data.Typeable
 -- import HStream.Error
-import RIO
+import           RIO
 import qualified RIO.ByteString.Lazy as BL
 
 newtype Deserializer a = Deserializer {runDeser :: BL.ByteString -> a}
 
 newtype Serializer a = Serializer {runSer :: a -> BL.ByteString}
 
-data Serde a = Serde
-  { serializer :: Serializer a,
-    deserializer :: Deserializer a
-  }
+data Serde a
+  = Serde
+      { serializer :: Serializer a,
+        deserializer :: Deserializer a
+      }
 
 voidDeserializer :: Maybe (Deserializer Void)
 voidDeserializer = Nothing
 
 voidSerializer :: Maybe (Serializer Void)
 voidSerializer = Nothing
-
 -- data EV = forall a. Typeable a => EV a
 --
 -- mkEV :: Typeable a => a -> EV

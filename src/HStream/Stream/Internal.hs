@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Stream.Internal
   ( InternalStreamBuilder (..),
@@ -20,20 +20,21 @@ module HStream.Stream.Internal
   )
 where
 
-import HStream.Encoding
-import HStream.Processor
-import HStream.Processor.Internal
-import HStream.Store
-import RIO
-import qualified RIO.ByteString.Lazy as BL
-import qualified RIO.Text as T
+import           HStream.Encoding
+import           HStream.Processor
+import           HStream.Processor.Internal
+import           HStream.Store
+import           RIO
+import qualified RIO.ByteString.Lazy        as BL
+import qualified RIO.Text                   as T
 
-data Stream k v = Stream
-  { streamKeySerde :: Maybe (Serde k),
-    streamValueSerde :: Maybe (Serde v),
-    streamProcessorName :: T.Text,
-    streamInternalBuilder :: InternalStreamBuilder
-  }
+data Stream k v
+  = Stream
+      { streamKeySerde :: Maybe (Serde k),
+        streamValueSerde :: Maybe (Serde v),
+        streamProcessorName :: T.Text,
+        streamInternalBuilder :: InternalStreamBuilder
+      }
 
 mkStream ::
   (Typeable k, Typeable v) =>
@@ -50,10 +51,11 @@ mkStream keySerde valueSerde processorName builder =
       streamInternalBuilder = builder
     }
 
-data InternalStreamBuilder = InternalStreamBuilder
-  { isbTaskBuilder :: TaskBuilder,
-    isbProcessorId :: IORef Int
-  }
+data InternalStreamBuilder
+  = InternalStreamBuilder
+      { isbTaskBuilder :: TaskBuilder,
+        isbProcessorId :: IORef Int
+      }
 
 mkInternalStreamBuilder :: TaskBuilder -> IO InternalStreamBuilder
 mkInternalStreamBuilder taskBuilder = do
@@ -125,9 +127,10 @@ mkInternalStoreName :: T.Text -> T.Text
 mkInternalStoreName namePrefix =
   namePrefix `T.append` "-STORE"
 
-data Materialized k v = Materialized
-  { mKeySerde :: Serde k,
-    mValueSerde :: Serde v,
-    mStateStore :: StateStore BL.ByteString BL.ByteString
-    -- mStateStore :: StateStore k v
-  }
+data Materialized k v
+  = Materialized
+      { mKeySerde :: Serde k,
+        mValueSerde :: Serde v,
+        mStateStore :: StateStore BL.ByteString BL.ByteString
+        -- mStateStore :: StateStore k v
+      }

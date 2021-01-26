@@ -1,12 +1,12 @@
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Error
   ( HStreamError (..),
   )
 where
 
-import RIO
+import           RIO
 
 data HStreamError
   = TaskTopologyBuildError Text

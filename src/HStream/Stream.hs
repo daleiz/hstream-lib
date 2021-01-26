@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Stream
   ( mkStreamBuilder,
@@ -25,41 +25,44 @@ module HStream.Stream
   )
 where
 
-import Data.Maybe
-import HStream.Encoding
-import HStream.Processor
-import HStream.Processor.Internal
-import HStream.Store
-import HStream.Stream.GroupedStream
-import HStream.Stream.Internal
-import HStream.Stream.JoinWindows
-import HStream.Table
-import HStream.Topic
-import HStream.Type
-import RIO
-import qualified RIO.ByteString.Lazy as BL
-import qualified RIO.Text as T
+import           Data.Maybe
+import           HStream.Encoding
+import           HStream.Processor
+import           HStream.Processor.Internal
+import           HStream.Store
+import           HStream.Stream.GroupedStream
+import           HStream.Stream.Internal
+import           HStream.Stream.JoinWindows
+import           HStream.Table
+import           HStream.Topic
+import           HStream.Type
+import           RIO
+import qualified RIO.ByteString.Lazy          as BL
+import qualified RIO.Text                     as T
 
-data StreamBuilder = StreamBuilder
-  { sbInternalBuilder :: InternalStreamBuilder
-  }
+data StreamBuilder
+  = StreamBuilder
+      { sbInternalBuilder :: InternalStreamBuilder
+      }
 
 mkStreamBuilder :: T.Text -> IO StreamBuilder
 mkStreamBuilder taskName = do
   internalStreamBuilder <- mkInternalStreamBuilder $ buildTask taskName
   return StreamBuilder {sbInternalBuilder = internalStreamBuilder}
 
-data StreamSourceConfig k v = StreamSourceConfig
-  { sscTopicName :: TopicName,
-    sscKeySerde :: Serde k,
-    sscValueSerde :: Serde v
-  }
+data StreamSourceConfig k v
+  = StreamSourceConfig
+      { sscTopicName :: TopicName,
+        sscKeySerde :: Serde k,
+        sscValueSerde :: Serde v
+      }
 
-data StreamSinkConfig k v = StreamSinkConfig
-  { sicTopicName :: TopicName,
-    sicKeySerde :: Serde k,
-    sicValueSerde :: Serde v
-  }
+data StreamSinkConfig k v
+  = StreamSinkConfig
+      { sicTopicName :: TopicName,
+        sicKeySerde :: Serde k,
+        sicValueSerde :: Serde v
+      }
 
 stream ::
   (Typeable k, Typeable v) =>
@@ -211,14 +214,15 @@ groupBy f Stream {..} = do
         gsValueSerde = Nothing
       }
 
-data StreamJoined k1 v1 k2 v2 = StreamJoined
-  { sjK1Serde :: Serde k1,
-    sjV1Serde :: Serde v1,
-    sjK2Serde :: Serde k2,
-    sjV2Serde :: Serde v2,
-    sjThisStore :: StateStore BL.ByteString BL.ByteString,
-    sjOtherStore :: StateStore BL.ByteString BL.ByteString
-  }
+data StreamJoined k1 v1 k2 v2
+  = StreamJoined
+      { sjK1Serde :: Serde k1,
+        sjV1Serde :: Serde v1,
+        sjK2Serde :: Serde k2,
+        sjV2Serde :: Serde v2,
+        sjThisStore :: StateStore BL.ByteString BL.ByteString,
+        sjOtherStore :: StateStore BL.ByteString BL.ByteString
+      }
 
 joinStream ::
   (Typeable k1, Typeable v1, Typeable k2, Typeable v2, Typeable k3, Typeable v3, Eq k3) =>
@@ -236,14 +240,12 @@ joinStream otherStream joiner thisKeySelector otherKeySelector JoinWindows {..} 
   let thisJoinStoreName = mkInternalStoreName thisJoinProcessorName
   otherJoinProcessorName <- mkInternalProcessorName "STREAM-JOIN-STREAM-Other-" mergedStreamBuilder
   let otherJoinStoreName = mkInternalStoreName otherJoinProcessorName
-
   -- ts1 - beforeMs <= ts2 <= ts1 + afterMs
   -- ts2 - afterMs <= ts1 <= ts2 + beforeMs
   let thisJoinProcessor = joinStreamProcessor joiner thisKeySelector otherKeySelector jwBeforeMs jwAfterMs thisJoinStoreName otherJoinStoreName sjK1Serde sjV1Serde sjK2Serde sjV2Serde
   let otherJoinProcessor = joinStreamProcessor (flip joiner) otherKeySelector thisKeySelector jwAfterMs jwBeforeMs otherJoinStoreName thisJoinStoreName sjK2Serde sjV2Serde sjK1Serde sjV1Serde
   mergeProcessorName <- mkInternalProcessorName "PASSTHROUGH-" mergedStreamBuilder
   let mergeProcessor = passThroughProcessor thisStream joiner
-
   let newTaskBuilder =
         isbTaskBuilder mergedStreamBuilder
           <> addProcessor thisJoinProcessorName thisJoinProcessor [streamProcessorName thisStream]
@@ -251,7 +253,6 @@ joinStream otherStream joiner thisKeySelector otherKeySelector JoinWindows {..} 
           <> addProcessor mergeProcessorName mergeProcessor [thisJoinProcessorName, otherJoinProcessorName]
           <> addStateStore thisJoinStoreName sjThisStore [thisJoinProcessorName, otherJoinProcessorName]
           <> addStateStore otherJoinStoreName sjOtherStore [thisJoinProcessorName, otherJoinProcessorName]
-
   return
     Stream
       { streamKeySerde = Nothing,
@@ -288,7 +289,6 @@ joinStreamProcessor joiner keySelector1 keySelector2 beforeMs afterMs storeName1
   let k1Bytes = runSer (serializer k1Serde) k1
   let v1Bytes = runSer (serializer v1Serde) recordValue
   liftIO $ tksPut (mkTimestampedKey k1Bytes recordTimestamp) v1Bytes store1
-
   store2 <- getTimestampedKVStateStore storeName2
   candinates <- liftIO $ tksRange (mkTimestampedKey k1Bytes $ recordTimestamp - beforeMs) (mkTimestampedKey k1Bytes $ recordTimestamp + afterMs) store2
   forM_
@@ -317,12 +317,10 @@ joinTable joinedTable@Table {..} joiner keySerde v2Serde Stream {..} = do
   joinProcessorName <- mkInternalProcessorName "Stream-JOIN-TABLE-" mergedStreamBuilder
   let joinProcessor = joinTableProcessor joinedTable joiner keySerde v2Serde
   let tableStore = fromJust $ getStateStoreFromTaskBuilder tableStoreName (isbTaskBuilder mergedStreamBuilder)
-
   let newTaskBuilder =
         isbTaskBuilder mergedStreamBuilder
           <> addProcessor joinProcessorName joinProcessor [streamProcessorName]
           <> addEStateStore tableStoreName tableStore [joinProcessorName]
-
   return
     Stream
       { streamKeySerde = Just keySerde,

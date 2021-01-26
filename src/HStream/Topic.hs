@@ -1,5 +1,5 @@
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Topic
   ( TopicName,
@@ -12,10 +12,10 @@ module HStream.Topic
   )
 where
 
-import HStream.Type
-import RIO
+import           HStream.Type
+import           RIO
 import qualified RIO.ByteString.Lazy as BL
-import qualified RIO.Text as T
+import qualified RIO.Text            as T
 
 type TopicName = T.Text
 
@@ -33,17 +33,19 @@ class TopicProducer a where
 
 -- closeProducer :: a -> IO ()
 
-data RawConsumerRecord = RawConsumerRecord
-  { rcrTopic :: TopicName,
-    rcrOffset :: Offset,
-    rcrTimestamp :: Timestamp,
-    rcrKey :: Maybe BL.ByteString,
-    rcrValue :: BL.ByteString
-  }
+data RawConsumerRecord
+  = RawConsumerRecord
+      { rcrTopic :: TopicName,
+        rcrOffset :: Offset,
+        rcrTimestamp :: Timestamp,
+        rcrKey :: Maybe BL.ByteString,
+        rcrValue :: BL.ByteString
+      }
 
-data RawProducerRecord = RawProducerRecord
-  { rprTopic :: TopicName,
-    rprKey :: Maybe BL.ByteString,
-    rprValue :: BL.ByteString,
-    rprTimestamp :: Timestamp
-  }
+data RawProducerRecord
+  = RawProducerRecord
+      { rprTopic :: TopicName,
+        rprKey :: Maybe BL.ByteString,
+        rprValue :: BL.ByteString,
+        rprTimestamp :: Timestamp
+      }

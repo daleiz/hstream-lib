@@ -1,32 +1,33 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
-import Data.Aeson
-import qualified Data.Binary as B
-import Data.Maybe
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
-import HStream.Encoding
-import HStream.Processor
-import HStream.Store
-import qualified HStream.Stream as HS
-import qualified HStream.Stream.GroupedStream as HG
+import           Data.Aeson
+import qualified Data.Binary                       as B
+import           Data.Maybe
+import qualified Data.Text.Lazy                    as TL
+import qualified Data.Text.Lazy.Encoding           as TLE
+import           HStream.Encoding
+import           HStream.Processor
+import           HStream.Store
+import qualified HStream.Stream                    as HS
+import qualified HStream.Stream.GroupedStream      as HG
 import qualified HStream.Stream.TimeWindowedStream as HTW
-import HStream.Stream.TimeWindows
-import qualified HStream.Table as HT
-import HStream.Topic
-import HStream.Util
-import RIO
-import System.Random
-import qualified Prelude as P
+import           HStream.Stream.TimeWindows
+import qualified HStream.Table                     as HT
+import           HStream.Topic
+import           HStream.Util
+import qualified Prelude                           as P
+import           RIO
+import           System.Random
 
-data R = R
-  { temperature :: Int,
-    humidity :: Int
-  }
+data R
+  = R
+      { temperature :: Int,
+        humidity :: Int
+      }
   deriving (Generic, Show, Typeable)
 
 instance ToJSON R
@@ -41,28 +42,24 @@ main = do
             deserializer = Deserializer TLE.decodeUtf8
           } ::
           Serde TL.Text
-
   let rSerde =
         Serde
           { serializer = Serializer encode,
             deserializer = Deserializer $ fromJust . decode
           } ::
           Serde R
-
   let intSerde =
         Serde
           { serializer = Serializer B.encode,
             deserializer = Deserializer $ B.decode
           } ::
           Serde Int
-
   let streamSourceConfig =
         HS.StreamSourceConfig
           { sscTopicName = "demo-source",
             sscKeySerde = textSerde,
             sscValueSerde = rSerde
           }
-
   let timeWindowSize = 3000
   let streamSinkConfig =
         HS.StreamSinkConfig
@@ -70,7 +67,6 @@ main = do
             sicKeySerde = timeWindowKeySerde textSerde timeWindowSize,
             sicValueSerde = intSerde
           }
-
   aggStore <- mkInMemoryStateKVStore
   let materialized =
         HS.Materialized
@@ -87,13 +83,12 @@ main = do
       >>= HTW.count materialized
       >>= HT.toStream
       >>= HS.to streamSinkConfig
-
   mockStore <- mkMockTopicStore
   mp <- mkMockTopicProducer mockStore
   mc' <- mkMockTopicConsumer mockStore
-
-  _ <- async $
-    forever $ do
+  _ <- async
+    $ forever
+    $ do
       threadDelay 1000000
       MockMessage {..} <- mkMockData
       send
@@ -104,10 +99,10 @@ main = do
             rprValue = mmValue,
             rprTimestamp = mmTimestamp
           }
-
   mc <- subscribe mc' ["demo-sink"]
-  _ <- async $
-    forever $ do
+  _ <- async
+    $ forever
+    $ do
       records <- pollRecords mc 1000000
       forM_ records $ \RawConsumerRecord {..} -> do
         let k = runDeser (timeWindowKeyDeserializer (deserializer textSerde) timeWindowSize) (fromJust rcrKey)
@@ -116,7 +111,6 @@ main = do
             ++ show k
             ++ " , value: "
             ++ show (B.decode rcrValue :: Int)
-
   logOptions <- logOptionsHandle stderr True
   withLogFunc logOptions $ \lf -> do
     let taskConfig =

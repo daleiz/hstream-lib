@@ -1,29 +1,30 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
-import Data.Aeson
-import qualified Data.Binary as B
-import Data.Maybe
-import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
+import           Data.Aeson
+import qualified Data.Binary             as B
+import           Data.Maybe
+import qualified Data.Text               as T
+import qualified Data.Text.Lazy          as TL
 import qualified Data.Text.Lazy.Encoding as TLE
-import HStream.Encoding
-import HStream.Processor
-import HStream.Store
-import HStream.Topic
-import HStream.Util
-import RIO
-import qualified RIO.ByteString.Lazy as BL
-import System.Random
-import qualified Prelude as P
+import           HStream.Encoding
+import           HStream.Processor
+import           HStream.Store
+import           HStream.Topic
+import           HStream.Util
+import qualified Prelude                 as P
+import           RIO
+import qualified RIO.ByteString.Lazy     as BL
+import           System.Random
 
-data R = R
-  { temperature :: Int,
-    humidity :: Int
-  }
+data R
+  = R
+      { temperature :: Int,
+        humidity :: Int
+      }
   deriving (Generic, Show, Typeable)
 
 instance ToJSON R
@@ -46,7 +47,6 @@ main = do
             keySerializer = Just $ Serializer TLE.encodeUtf8,
             valueSerializer = Serializer (B.encode :: Int -> BL.ByteString)
           }
-
   memoryStore <- mkInMemoryStateKVStore :: IO (StateStore TL.Text Int)
   let task =
         build $
@@ -62,13 +62,12 @@ main = do
               ["filter"]
             <> addSink sinkConfig ["count"]
             <> addStateStore "demo-store" memoryStore ["count"]
-
   mockStore <- mkMockTopicStore
   mp <- mkMockTopicProducer mockStore
   mc' <- mkMockTopicConsumer mockStore
-
-  _ <- async $
-    forever $ do
+  _ <- async
+    $ forever
+    $ do
       threadDelay 1000000
       MockMessage {..} <- mkMockData
       send
@@ -79,10 +78,10 @@ main = do
             rprValue = mmValue,
             rprTimestamp = mmTimestamp
           }
-
   mc <- subscribe mc' ["demo-sink"]
-  _ <- async $
-    forever $ do
+  _ <- async
+    $ forever
+    $ do
       records <- pollRecords mc 1000000
       forM_ records $ \RawConsumerRecord {..} -> do
         let k = fromJust rcrKey
@@ -91,7 +90,6 @@ main = do
             ++ show k
             ++ " , value: "
             ++ show (B.decode rcrValue :: Int)
-
   logOptions <- logOptionsHandle stderr True
   withLogFunc logOptions $ \lf -> do
     let taskConfig =

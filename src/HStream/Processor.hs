@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Processor
   ( buildTask,
@@ -29,22 +29,22 @@ module HStream.Processor
   )
 where
 
-import Control.Exception (throw)
-import Data.Maybe
-import Data.Typeable
-import HStream.Encoding
-import HStream.Error (HStreamError (..))
-import HStream.Processor.Internal
-import HStream.Store
-import HStream.Topic
-import HStream.Util
-import RIO
-import qualified RIO.ByteString.Lazy as BL
-import qualified RIO.HashMap as HM
-import RIO.HashMap.Partial as HM'
-import qualified RIO.HashSet as HS
-import qualified RIO.List as L
-import qualified RIO.Text as T
+import           Control.Exception          (throw)
+import           Data.Maybe
+import           Data.Typeable
+import           HStream.Encoding
+import           HStream.Error              (HStreamError (..))
+import           HStream.Processor.Internal
+import           HStream.Store
+import           HStream.Topic
+import           HStream.Util
+import           RIO
+import qualified RIO.ByteString.Lazy        as BL
+import qualified RIO.HashMap                as HM
+import           RIO.HashMap.Partial        as HM'
+import qualified RIO.HashSet                as HS
+import qualified RIO.List                   as L
+import qualified RIO.Text                   as T
 
 -- import qualified Prelude as P
 
@@ -101,19 +101,21 @@ validateTopology TaskTopologyConfig {..} =
         then throw $ TaskTopologyBuildError "task build error: no valid sink config"
         else ()
 
-data SourceConfig k v = SourceConfig
-  { sourceName :: T.Text,
-    sourceTopicName :: T.Text,
-    keyDeserializer :: Maybe (Deserializer k),
-    valueDeserializer :: Deserializer v
-  }
+data SourceConfig k v
+  = SourceConfig
+      { sourceName :: T.Text,
+        sourceTopicName :: T.Text,
+        keyDeserializer :: Maybe (Deserializer k),
+        valueDeserializer :: Deserializer v
+      }
 
-data SinkConfig k v = SinkConfig
-  { sinkName :: T.Text,
-    sinkTopicName :: T.Text,
-    keySerializer :: Maybe (Serializer k),
-    valueSerializer :: Serializer v
-  }
+data SinkConfig k v
+  = SinkConfig
+      { sinkName :: T.Text,
+        sinkTopicName :: T.Text,
+        keySerializer :: Maybe (Serializer k),
+        valueSerializer :: Serializer v
+      }
 
 addSource ::
   (Typeable k, Typeable v) =>
@@ -268,7 +270,6 @@ runTask TaskConfig {..} task@Task {..} = do
       Mock mockStore -> mkMockTopicProducer mockStore
       LogDevice -> throwIO $ UnSupportedMessageStoreError "LogDevice is not supported!"
       Kafka -> throwIO $ UnSupportedMessageStoreError "Kafka is not supported!"
-
   -- add InternalSink Node
   let newTaskTopologyForward =
         HM.foldlWithKey'
@@ -282,13 +283,12 @@ runTask TaskConfig {..} task@Task {..} = do
           )
           taskTopologyForward
           taskSinkConfig
-
   ctx <- buildTaskContext task {taskTopologyForward = newTaskTopologyForward} tcLogFunc
-
   let sourceTopicNames = HM.keys taskSourceConfig
   topicConsumer' <- subscribe topicConsumer sourceTopicNames
-  forever $
-    runRIO ctx $ do
+  forever
+    $ runRIO ctx
+    $ do
       logDebug "start iteration..."
       rawRecords <- liftIO $ pollRecords topicConsumer' 2000000
       logDebug $ "polled " <> display (length rawRecords) <> " records"
@@ -301,10 +301,11 @@ runTask TaskConfig {..} task@Task {..} = do
             runEP sourceEProcessor (mkERecord Record {recordKey = rcrKey, recordValue = rcrValue, recordTimestamp = rcrTimestamp})
         )
 
-data TaskConfig = TaskConfig
-  { tcMessageStoreType :: MessageStoreType,
-    tcLogFunc :: LogFunc
-  }
+data TaskConfig
+  = TaskConfig
+      { tcMessageStoreType :: MessageStoreType,
+        tcLogFunc :: LogFunc
+      }
 
 data MessageStoreType
   = Mock MockTopicStore
@@ -384,21 +385,24 @@ getTimestampedKVStateStore storeName = do
         else error "no state store found"
     Nothing -> error "no state store found"
 
-data MockMessage = MockMessage
-  { mmTimestamp :: Timestamp,
-    mmKey :: Maybe BL.ByteString,
-    mmValue :: BL.ByteString
-  }
+data MockMessage
+  = MockMessage
+      { mmTimestamp :: Timestamp,
+        mmKey :: Maybe BL.ByteString,
+        mmValue :: BL.ByteString
+      }
 
-data MockTopicStore = MockTopicStore
-  { mtsData :: TVar (HM.HashMap T.Text [MockMessage])
-  }
+data MockTopicStore
+  = MockTopicStore
+      { mtsData :: TVar (HM.HashMap T.Text [MockMessage])
+      }
 
-data MockTopicConsumer = MockTopicConsumer
-  { mtcSubscribedTopics :: HS.HashSet TopicName,
-    mtcTopicOffsets :: HM.HashMap T.Text Offset,
-    mtcStore :: MockTopicStore
-  }
+data MockTopicConsumer
+  = MockTopicConsumer
+      { mtcSubscribedTopics :: HS.HashSet TopicName,
+        mtcTopicOffsets :: HM.HashMap T.Text Offset,
+        mtcStore :: MockTopicStore
+      }
 
 instance TopicConsumer MockTopicConsumer where
   subscribe tc topicNames = return $ tc {mtcSubscribedTopics = HS.fromList topicNames}
@@ -448,9 +452,10 @@ mkMockTopicConsumer topicStore =
         mtcStore = topicStore
       }
 
-data MockTopicProducer = MockTopicProducer
-  { mtpStore :: MockTopicStore
-  }
+data MockTopicProducer
+  = MockTopicProducer
+      { mtpStore :: MockTopicStore
+      }
 
 mkMockTopicProducer ::
   MockTopicStore ->

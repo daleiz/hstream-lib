@@ -1,36 +1,38 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
-import Data.Aeson
-import Data.Maybe
-import qualified Data.Text.Lazy as TL
+import           Data.Aeson
+import           Data.Maybe
+import qualified Data.Text.Lazy          as TL
 import qualified Data.Text.Lazy.Encoding as TLE
-import HStream.Encoding
-import HStream.Processor
-import qualified HStream.Stream as HS
-import HStream.Topic
-import HStream.Util
-import RIO
-import qualified RIO.ByteString.Lazy as BL
-import System.Random
-import qualified Prelude as P
+import           HStream.Encoding
+import           HStream.Processor
+import qualified HStream.Stream          as HS
+import           HStream.Topic
+import           HStream.Util
+import qualified Prelude                 as P
+import           RIO
+import qualified RIO.ByteString.Lazy     as BL
+import           System.Random
 
-data R = R
-  { temperature :: Int,
-    humidity :: Int
-  }
+data R
+  = R
+      { temperature :: Int,
+        humidity :: Int
+      }
   deriving (Generic, Show, Typeable)
 
 instance ToJSON R
 
 instance FromJSON R
 
-data R1 = R1
-  { r1Temperature :: Int
-  }
+data R1
+  = R1
+      { r1Temperature :: Int
+      }
   deriving (Generic, Show, Typeable)
 
 instance ToJSON R1
@@ -45,48 +47,42 @@ main = do
             deserializer = Deserializer TLE.decodeUtf8
           } ::
           Serde TL.Text
-
   let rSerde =
         Serde
           { serializer = Serializer encode,
             deserializer = Deserializer $ fromJust . decode
           } ::
           Serde R
-
   let r1Serde =
         Serde
           { serializer = Serializer encode,
             deserializer = Deserializer $ fromJust . decode
           } ::
           Serde R1
-
   let streamSourceConfig =
         HS.StreamSourceConfig
           { sscTopicName = "demo-source",
             sscKeySerde = textSerde,
             sscValueSerde = rSerde
           }
-
   let streamSinkConfig =
         HS.StreamSinkConfig
           { sicTopicName = "demo-sink",
             sicKeySerde = textSerde,
             sicValueSerde = r1Serde
           }
-
   streamBuilder <-
     HS.mkStreamBuilder "demo"
       >>= HS.stream streamSourceConfig
       >>= HS.filter filterR
       >>= HS.map mapR
       >>= HS.to streamSinkConfig
-
   mockStore <- mkMockTopicStore
   mp <- mkMockTopicProducer mockStore
   mc' <- mkMockTopicConsumer mockStore
-
-  _ <- async $
-    forever $ do
+  _ <- async
+    $ forever
+    $ do
       threadDelay 1000000
       MockMessage {..} <- mkMockData
       send
@@ -97,14 +93,13 @@ main = do
             rprValue = mmValue,
             rprTimestamp = mmTimestamp
           }
-
   mc <- subscribe mc' ["demo-sink"]
-  _ <- async $
-    forever $ do
+  _ <- async
+    $ forever
+    $ do
       records <- pollRecords mc 1000000
       forM_ records $ \RawConsumerRecord {..} ->
         P.putStr "detect abnormal data: " >> BL.putStrLn rcrValue
-
   logOptions <- logOptionsHandle stderr True
   withLogFunc logOptions $ \lf -> do
     let taskConfig =

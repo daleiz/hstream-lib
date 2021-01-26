@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Stream.TimeWindows
   ( TimeWindow (..),
@@ -17,21 +17,23 @@ module HStream.Stream.TimeWindows
   )
 where
 
-import Data.Binary.Get
+import           Data.Binary.Get
 import qualified Data.ByteString.Builder as BB
-import HStream.Encoding
-import RIO
+import           HStream.Encoding
+import           RIO
 
-data TimeWindows = TimeWindows
-  { twSizeMs :: Int64,
-    twAdvanceMs :: Int64,
-    twGraceMs :: Int64
-  }
+data TimeWindows
+  = TimeWindows
+      { twSizeMs :: Int64,
+        twAdvanceMs :: Int64,
+        twGraceMs :: Int64
+      }
 
-data SessionWindows = SessionWindows
-  { swInactivityGap :: Int64,
-    swGraceMs :: Int64
-  }
+data SessionWindows
+  = SessionWindows
+      { swInactivityGap :: Int64,
+        swGraceMs :: Int64
+      }
 
 mkTumblingWindow :: Int64 -> TimeWindows
 mkTumblingWindow windowSize =
@@ -49,10 +51,11 @@ mkHoppingWindow windowSize stepSize =
       twGraceMs = 24 * 3600 * 1000
     }
 
-data TimeWindow = TimeWindow
-  { tWindowStart :: Int64,
-    tWindowEnd :: Int64
-  }
+data TimeWindow
+  = TimeWindow
+      { tWindowStart :: Int64,
+        tWindowEnd :: Int64
+      }
 
 instance Show TimeWindow where
   show TimeWindow {..} = "[" ++ show tWindowStart ++ ", " ++ show tWindowEnd ++ "]"
@@ -64,10 +67,11 @@ mkTimeWindow startTs endTs =
       tWindowEnd = endTs
     }
 
-data TimeWindowKey k = TimeWindowKey
-  { twkKey :: k,
-    twkWindow :: TimeWindow
-  }
+data TimeWindowKey k
+  = TimeWindowKey
+      { twkKey :: k,
+        twkWindow :: TimeWindow
+      }
 
 instance (Show k) => Show (TimeWindowKey k) where
   show TimeWindowKey {..} = "key: " ++ show twkKey ++ ", window: " ++ show twkWindow

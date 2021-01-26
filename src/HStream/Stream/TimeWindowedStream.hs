@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Stream.TimeWindowedStream
   ( TimeWindowedStream (..),
@@ -10,24 +10,25 @@ module HStream.Stream.TimeWindowedStream
   )
 where
 
-import Data.Maybe
-import HStream.Encoding
-import HStream.Processor
-import HStream.Processor.Internal
-import HStream.Store
-import HStream.Stream.Internal
-import HStream.Stream.TimeWindows
-import HStream.Table
-import RIO
-import qualified RIO.Text as T
+import           Data.Maybe
+import           HStream.Encoding
+import           HStream.Processor
+import           HStream.Processor.Internal
+import           HStream.Store
+import           HStream.Stream.Internal
+import           HStream.Stream.TimeWindows
+import           HStream.Table
+import           RIO
+import qualified RIO.Text                   as T
 
-data TimeWindowedStream k v = TimeWindowedStream
-  { twsKeySerde :: Maybe (Serde k),
-    twsValueSerde :: Maybe (Serde v),
-    twsProcessorName :: T.Text,
-    twsTimeWindows :: TimeWindows,
-    twsInternalBuilder :: InternalStreamBuilder
-  }
+data TimeWindowedStream k v
+  = TimeWindowedStream
+      { twsKeySerde :: Maybe (Serde k),
+        twsValueSerde :: Maybe (Serde v),
+        twsProcessorName :: T.Text,
+        twsTimeWindows :: TimeWindows,
+        twsInternalBuilder :: InternalStreamBuilder
+      }
 
 aggregate ::
   (Typeable k, Typeable v, Ord k, Typeable a) =>

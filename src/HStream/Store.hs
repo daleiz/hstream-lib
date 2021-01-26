@@ -1,8 +1,8 @@
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE StrictData                #-}
 
 module HStream.Store
   ( KVStore (..),
@@ -29,20 +29,21 @@ module HStream.Store
   )
 where
 
-import Control.Exception (throw)
-import Data.Maybe
-import Data.Typeable
-import HStream.Error
-import HStream.Stream.SessionWindows
-import HStream.Stream.TimeWindows
-import HStream.Type
-import RIO
-import qualified RIO.Map as Map
-import qualified RIO.Text as T
+import           Control.Exception             (throw)
+import           Data.Maybe
+import           Data.Typeable
+import           HStream.Error
+import           HStream.Stream.SessionWindows
+import           HStream.Stream.TimeWindows
+import           HStream.Type
+import           RIO
+import qualified RIO.Map                       as Map
+import qualified RIO.Text                      as T
 
-data InMemoryKVStore k v = InMemoryKVStore
-  { imksData :: IORef (Map k v)
-  }
+data InMemoryKVStore k v
+  = InMemoryKVStore
+      { imksData :: IORef (Map k v)
+      }
 
 mkInMemoryKVStore :: IO (InMemoryKVStore k v)
 mkInMemoryKVStore = do
@@ -80,12 +81,14 @@ instance KVStore InMemoryKVStore where
 data EKVStore k v
   = forall s.
     KVStore s =>
-    EKVStore (s k v)
+    EKVStore
+      (s k v)
 
 data DEKVStore
   = forall k v.
     (Typeable k, Typeable v) =>
-    DEKVStore (EKVStore k v)
+    DEKVStore
+      (EKVStore k v)
 
 instance KVStore EKVStore where
   ksGet k (EKVStore s) = ksGet k s
@@ -138,7 +141,8 @@ class SessionStore s where
 data ESessionStore k v
   = forall s.
     SessionStore s =>
-    ESessionStore (s k v)
+    ESessionStore
+      (s k v)
 
 instance SessionStore ESessionStore where
   ssGet k (ESessionStore s) = ssGet k s
@@ -152,7 +156,8 @@ instance SessionStore ESessionStore where
 data DESessionStore
   = forall k v.
     (Typeable k, Typeable v) =>
-    DESessionStore (ESessionStore k v)
+    DESessionStore
+      (ESessionStore k v)
 
 fromDESessionStoreToESessionStore ::
   (Typeable k, Typeable v, Ord k) =>
@@ -162,13 +167,14 @@ fromDESessionStoreToESessionStore (DESessionStore eStore) =
   case cast eStore of
     Just es -> es
     Nothing ->
-      throw $
-        TypeCastError $
-          "fromDESessionStoreToESessionStore: type cast error, actual eStore type is " `T.append` T.pack (show $ typeOf eStore)
+      throw
+        $ TypeCastError
+        $ "fromDESessionStoreToESessionStore: type cast error, actual eStore type is " `T.append` T.pack (show $ typeOf eStore)
 
-data InMemorySessionStore k v = InMemorySessionStore
-  { imssData :: IORef (Map Timestamp (IORef (Map k (IORef (Map Timestamp v)))))
-  }
+data InMemorySessionStore k v
+  = InMemorySessionStore
+      { imssData :: IORef (Map Timestamp (IORef (Map k (IORef (Map Timestamp v)))))
+      }
 
 mkInMemorySessionStore :: IO (InMemorySessionStore k v)
 mkInMemorySessionStore = do
@@ -304,9 +310,10 @@ class TimestampedKVStore s where
   tksPut :: Ord k => TimestampedKey k -> v -> s k v -> IO ()
   tksRange :: Ord k => TimestampedKey k -> TimestampedKey k -> s k v -> IO [(TimestampedKey k, v)]
 
-data InMemoryTimestampedKVStore k v = InMemoryTimestampedKVStore
-  { imtksData :: IORef (Map Int64 (IORef (Map k v)))
-  }
+data InMemoryTimestampedKVStore k v
+  = InMemoryTimestampedKVStore
+      { imtksData :: IORef (Map Int64 (IORef (Map k v)))
+      }
 
 mkInMemoryTimestampedKVStore :: IO (InMemoryTimestampedKVStore k v)
 mkInMemoryTimestampedKVStore = do
@@ -368,12 +375,14 @@ instance TimestampedKVStore InMemoryTimestampedKVStore where
 data ETimestampedKVStore k v
   = forall s.
     TimestampedKVStore s =>
-    ETimestampedKVStore (s k v)
+    ETimestampedKVStore
+      (s k v)
 
 data DETimestampedKVStore
   = forall k v.
     (Typeable k, Typeable v) =>
-    DETimestampedKVStore (ETimestampedKVStore k v)
+    DETimestampedKVStore
+      (ETimestampedKVStore k v)
 
 fromDETimestampedKVStoreToETimestampedKVStore ::
   (Typeable k, Typeable v, Ord k) =>

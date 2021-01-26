@@ -1,7 +1,7 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
 module HStream.Stream.SessionWindowedStream
   ( SessionWindowedStream (..),
@@ -10,25 +10,26 @@ module HStream.Stream.SessionWindowedStream
   )
 where
 
-import Data.Maybe
-import Data.Typeable
-import HStream.Encoding
-import HStream.Processor
-import HStream.Store
-import HStream.Stream.Internal
-import HStream.Stream.SessionWindows
-import HStream.Stream.TimeWindows
-import HStream.Table
-import RIO
-import qualified RIO.Text as T
+import           Data.Maybe
+import           Data.Typeable
+import           HStream.Encoding
+import           HStream.Processor
+import           HStream.Store
+import           HStream.Stream.Internal
+import           HStream.Stream.SessionWindows
+import           HStream.Stream.TimeWindows
+import           HStream.Table
+import           RIO
+import qualified RIO.Text                      as T
 
-data SessionWindowedStream k v = SessionWindowedStream
-  { swsKeySerde :: Maybe (Serde k),
-    swsValueSerde :: Maybe (Serde v),
-    swsProcessorName :: T.Text,
-    swsSessionWindows :: SessionWindows,
-    swsInternalBuilder :: InternalStreamBuilder
-  }
+data SessionWindowedStream k v
+  = SessionWindowedStream
+      { swsKeySerde :: Maybe (Serde k),
+        swsValueSerde :: Maybe (Serde v),
+        swsProcessorName :: T.Text,
+        swsSessionWindows :: SessionWindows,
+        swsInternalBuilder :: InternalStreamBuilder
+      }
 
 aggregate ::
   (Typeable k, Typeable v, Ord k, Typeable a) =>
@@ -62,7 +63,6 @@ count = aggregate 0 aggF sessionMergeF
   where
     aggF :: Int -> Record k v -> Int
     aggF acc _ = acc + 1
-
     sessionMergeF :: k -> Int -> Int -> Int
     sessionMergeF _ acc1 acc2 = acc1 + acc2
 

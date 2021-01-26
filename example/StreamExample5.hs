@@ -1,47 +1,50 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE StrictData #-}
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE StrictData        #-}
 
-import Data.Aeson
-import Data.Maybe
-import qualified Data.Text.Lazy as TL
+import           Data.Aeson
+import           Data.Maybe
+import qualified Data.Text.Lazy          as TL
 import qualified Data.Text.Lazy.Encoding as TLE
-import HStream.Encoding
-import HStream.Processor
-import qualified HStream.Stream as HS
-import HStream.Topic
-import HStream.Util
-import RIO
-import qualified RIO.ByteString.Lazy as BL
-import System.Random
-import qualified Prelude as P
+import           HStream.Encoding
+import           HStream.Processor
+import qualified HStream.Stream          as HS
+import           HStream.Topic
+import           HStream.Util
+import qualified Prelude                 as P
+import           RIO
+import qualified RIO.ByteString.Lazy     as BL
+import           System.Random
 
-data R = R
-  { temperature :: Int,
-    humidity :: Int
-  }
+data R
+  = R
+      { temperature :: Int,
+        humidity :: Int
+      }
   deriving (Generic, Show, Typeable)
 
 instance ToJSON R
 
 instance FromJSON R
 
-data R1 = R1
-  { location :: TL.Text
-  }
+data R1
+  = R1
+      { location :: TL.Text
+      }
   deriving (Generic, Show, Typeable)
 
 instance ToJSON R1
 
 instance FromJSON R1
 
-data R2 = R2
-  { r2Location :: TL.Text,
-    r2Temperature :: Int,
-    r2Humidity :: Int
-  }
+data R2
+  = R2
+      { r2Location :: TL.Text,
+        r2Temperature :: Int,
+        r2Humidity :: Int
+      }
   deriving (Generic, Show, Typeable)
 
 instance ToJSON R2
@@ -56,67 +59,56 @@ main = do
             deserializer = Deserializer TLE.decodeUtf8
           } ::
           Serde TL.Text
-
   let rSerde =
         Serde
           { serializer = Serializer encode,
             deserializer = Deserializer $ fromJust . decode
           } ::
           Serde R
-
   let r1Serde =
         Serde
           { serializer = Serializer encode,
             deserializer = Deserializer $ fromJust . decode
           } ::
           Serde R1
-
   let r2Serde =
         Serde
           { serializer = Serializer encode,
             deserializer = Deserializer $ fromJust . decode
           } ::
           Serde R2
-
   let streamTopicName = "stream-source"
   let tableTopicName = "table-source"
   let sinkTopicName = "demo-sink"
-
   let streamSourceConfig1 =
         HS.StreamSourceConfig
           { sscTopicName = streamTopicName,
             sscKeySerde = textSerde,
             sscValueSerde = rSerde
           }
-
   let streamSourceConfig2 =
         HS.StreamSourceConfig
           { sscTopicName = tableTopicName,
             sscKeySerde = textSerde,
             sscValueSerde = r1Serde
           }
-
   let streamSinkConfig =
         HS.StreamSinkConfig
           { sicTopicName = sinkTopicName,
             sicKeySerde = textSerde,
             sicValueSerde = r2Serde
           }
-
   table <-
     HS.mkStreamBuilder ""
       >>= HS.table streamSourceConfig2
-
   streamBuilder <-
     HS.mkStreamBuilder "demo"
       >>= HS.stream streamSourceConfig1
       >>= HS.joinTable table joiner textSerde r1Serde
       >>= HS.to streamSinkConfig
-
   mockStore <- mkMockTopicStore
   mp <- mkMockTopicProducer mockStore
   mc' <- mkMockTopicConsumer mockStore
-
   forM_
     ([1 .. 3] :: [Int])
     ( \i ->
@@ -129,9 +121,9 @@ main = do
               rprTimestamp = -1
             }
     )
-
-  _ <- async $
-    forever $ do
+  _ <- async
+    $ forever
+    $ do
       threadDelay 1000000
       MockMessage {..} <- mkMockData
       send
@@ -142,14 +134,13 @@ main = do
             rprValue = mmValue,
             rprTimestamp = mmTimestamp
           }
-
   mc <- subscribe mc' [sinkTopicName]
-  _ <- async $
-    forever $ do
+  _ <- async
+    $ forever
+    $ do
       records <- pollRecords mc 1000000
       forM_ records $ \RawConsumerRecord {..} ->
         P.putStr "joined data: " >> BL.putStrLn rcrValue
-
   logOptions <- logOptionsHandle stderr True
   withLogFunc logOptions $ \lf -> do
     let taskConfig =
